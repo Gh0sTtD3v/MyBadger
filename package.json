@@ -1,0 +1,33 @@
+{
+  "name": "indexer-app",
+  "version": "0.1.0",
+  "private": true,
+  "main": "electron/main.js",
+  "author": "gh0stt_dev",
+  "license": "MIT",
+  "scripts": {
+    "next:dev": "next dev --port 3131",
+    "electron:dev": "electron .",
+    "dev": "concurrently \"npm run next:dev\" \"wait-on http://localhost:3131 && npm run electron:dev\"",
+    "build": "next build",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "@helia/unixfs": "^7.0.4",
+    "@seald-io/nedb": "^4.1.2",
+    "axios": "^1.13.6",
+    "blockstore-fs": "^3.0.2",
+    "datastore-fs": "^11.0.2",
+    "helia": "^6.0.20",
+    "next": "^15.0.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^3.7.2",
+    "concurrently": "^9.0.0",
+    "electron": "^33.0.0",
+    "wait-on": "^8.0.0"
+  }
+}
