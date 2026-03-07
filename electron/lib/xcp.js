@@ -1,5 +1,6 @@
 const axios = require('axios')
 const { upsertNFTs } = require('./db')
+const llm   = require('./llm')
 
 const COUNTERPARTY = 'https://api.counterparty.io:4000'
 const IPFS_GATEWAY = 'https://nftstorage.link/ipfs/'
@@ -28,13 +29,14 @@ function stripArweave(url) {
   return match ? match[1] : url
 }
 
-function extractImageFromPeripheral(json) {
+async function extractImageFromPeripheral(json) {
   if (json.description) {
     const match = json.description.match(/<img[^>]+src=["']([^"']+)["']/i)
     if (match) return stripArweave(match[1])
   }
   const raw = json.image || json.image_url || json.animation_url || null
-  return stripArweave(raw)
+  if (raw) return stripArweave(raw)
+  return await llm.extractImageUrl(json)
 }
 
 // Get candidate URL from description — could be inline JSON, ipfs://, ar://, or https://
@@ -99,7 +101,7 @@ async function runXcp(wallets, send) {
       if (candidateUrl) {
         peripheral = await fetchPeripheral(candidateUrl)
         if (peripheral) {
-          const extracted = extractImageFromPeripheral(peripheral)
+          const extracted = await extractImageFromPeripheral(peripheral)
           if (extracted) imageUrl = normalizeUrl(extracted)
         }
       }

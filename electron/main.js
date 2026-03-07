@@ -11,6 +11,7 @@ const { runXrpl }   = require('./lib/xrpl')
 const { runSolana } = require('./lib/solana')
 const { runCurate } = require('./lib/curate')
 const ipfs = require('./lib/ipfs')
+const llm  = require('./lib/llm')
 const { generateWallpaperHtml, generateProjectJson } = require('./lib/wallpaper')
 const fs = require('fs')
 
@@ -30,6 +31,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
+    icon: path.join(__dirname, '..', 'public', 'logo.png')
   })
   isDev ? win.loadURL(DEV_URL) : win.loadFile(path.join(__dirname, '..', 'out', 'index.html'))
 }
@@ -37,6 +39,7 @@ function createWindow() {
 app.whenReady().then(() => {
   db.initDb(app.getPath('userData'))
   ipfs.initIpfs(app.getPath('userData'))
+  llm.initLlm(app.getPath('userData'))
 
   protocol.handle('nftmedia', (request) => {
     const filepath = decodeURIComponent(new URL(request.url).pathname.replace(/^\//, ''))
@@ -49,6 +52,13 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
 app.on('before-quit', () => ipfs.stopIpfs())
+
+ipcMain.handle('llm:status',   () => llm.getStatus())
+ipcMain.handle('llm:download', async (event) => {
+  const result = await llm.downloadModel(p => event.sender.send('llm-event', p))
+  if (result.ok) await llm.initLlm(app.getPath('userData'))
+  return result
+})
 
 ipcMain.handle('ipfs:status', () => ipfs.getStatus())
 ipcMain.handle('ipfs:unpin', async (_e, { nftId, cid }) => {

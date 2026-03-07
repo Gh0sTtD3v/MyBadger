@@ -44,6 +44,14 @@ contextBridge.exposeInMainWorld('electron', {
   // Wallpaper
   generateWallpaper: (curationId, curationName) => invoke('wallpaper:generate', { curationId, curationName }),
 
+  // LLM
+  llm: {
+    status:          ()   => invoke('llm:status'),
+    download:        ()   => invoke('llm:download'),
+    onEvent:         (cb) => ipcRenderer.on('llm-event', (_e, p) => cb(p)),
+    removeListeners: ()   => ipcRenderer.removeAllListeners('llm-event'),
+  },
+
   // IPFS
   ipfs: {
     status: ()                              => invoke('ipfs:status'),

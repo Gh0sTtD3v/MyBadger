@@ -2,7 +2,7 @@ import './globals.css'
 import ClientLayout from './ClientLayout'
 
 export const metadata = {
-  title: 'Indexer',
+  title: 'MyBadger',
 }
 
 export default function RootLayout({ children }) {

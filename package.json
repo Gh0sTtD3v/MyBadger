@@ -20,9 +20,15 @@
     "datastore-fs": "^11.0.2",
     "helia": "^6.0.20",
     "next": "^15.0.0",
+    "node-llama-cpp": "^3.17.1",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "sharp": "^0.34.5"
+  },
+  "build": {
+    "directories": {
+      "buildResources": "resources"
+    }
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.2",

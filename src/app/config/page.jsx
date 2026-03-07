@@ -7,12 +7,29 @@ export default function Config() {
   const { apiKey, setApiKey } = useConfig()
   const [mediaDir,    setMediaDir]    = useState('')
   const [ipfsStatus,  setIpfsStatus]  = useState(null)
+  const [llmStatus,   setLlmStatus]   = useState(null)
+  const [llmProgress, setLlmProgress] = useState(null)
 
   useEffect(() => {
     if (!window.electron) return
     window.electron.settings.getMediaDir().then(setMediaDir)
     window.electron.ipfs.status().then(setIpfsStatus)
+    window.electron.llm.status().then(setLlmStatus)
   }, [])
+
+  async function downloadModel() {
+    if (!window.electron) return
+    setLlmProgress({ downloaded: 0, total: 0 })
+    window.electron.llm.onEvent(p => setLlmProgress(p))
+    const result = await window.electron.llm.download()
+    window.electron.llm.removeListeners()
+    if (result.ok) {
+      setLlmProgress(null)
+      window.electron.llm.status().then(setLlmStatus)
+    } else {
+      setLlmProgress({ error: result.error })
+    }
+  }
 
   async function browseFolder() {
     const selected = await window.electron.settings.selectFolder()
@@ -43,6 +60,41 @@ export default function Config() {
             {mediaDir || 'default'}
           </div>
           <button onClick={browseFolder} style={browseBtn}>Browse</button>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <label style={labelStyle}>AI Model (Phi-3.5 Mini · ~2GB)</label>
+        <div style={{ fontSize: '11px', fontFamily: 'monospace', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {llmStatus === null ? (
+            <span style={{ color: '#333' }}>loading...</span>
+          ) : llmStatus.ready ? (
+            <span style={{ color: '#a3e635' }}>● ready</span>
+          ) : llmStatus.downloaded ? (
+            <span style={{ color: '#60a5fa' }}>● downloaded · loading...</span>
+          ) : (
+            <>
+              <span style={{ color: '#555' }}>● not downloaded</span>
+              {llmProgress ? (
+                llmProgress.error ? (
+                  <span style={{ color: '#ef4444' }}>{llmProgress.error}</span>
+                ) : llmProgress.total > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ height: '3px', background: '#1a1a1a', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${(llmProgress.downloaded / llmProgress.total) * 100}%`, background: '#60a5fa', transition: 'width 0.3s ease' }} />
+                    </div>
+                    <span style={{ color: '#444', fontSize: '10px' }}>
+                      {(llmProgress.downloaded / 1e6).toFixed(0)} / {(llmProgress.total / 1e6).toFixed(0)} MB
+                    </span>
+                  </div>
+                ) : (
+                  <span style={{ color: '#444' }}>connecting...</span>
+                )
+              ) : (
+                <button onClick={downloadModel} style={browseBtn}>Download</button>
+              )}
+            </>
+          )}
         </div>
       </div>
 
