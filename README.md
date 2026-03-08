@@ -11,7 +11,7 @@ MyBadger is free and open-source software released under the [MIT License](LICEN
 ```
 MIT License
 
-Copyright (c) 2024 gh0stt_dev
+Copyright (c) 2026 gh0stt_dev
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
