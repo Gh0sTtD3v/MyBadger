@@ -44,6 +44,9 @@ contextBridge.exposeInMainWorld('electron', {
   // Wallpaper
   generateWallpaper: (curationId, curationName) => invoke('wallpaper:generate', { curationId, curationName }),
 
+  // Generate folder (artworks only, no HTML)
+  generateFolder: (curationId, curationName) => invoke('folder:generate', { curationId, curationName }),
+
   // LLM
   llm: {
     status:          ()   => invoke('llm:status'),

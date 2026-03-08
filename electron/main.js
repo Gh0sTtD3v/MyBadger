@@ -248,6 +248,41 @@ ipcMain.handle('wallpaper:generate', async (_e, { curationId, curationName }) =>
   return { filePath: projectDir }
 })
 
+// ── Generate Folder ─────────────────────────────────────────────────────────────────────────────────────────────────────
+ipcMain.handle('folder:generate', async (_e, { curationId, curationName }) => {
+  const { rows } = await db.getCuratedNfts(curationId, { limit: 9999 })
+  const withMedia = rows.filter(n => n.localPath)
+
+  if (!withMedia.length) return { error: 'No local media found in this curation.' }
+
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    title: 'Select folder to copy artworks into',
+    properties: ['openDirectory'],
+  })
+
+  if (canceled || !filePaths.length) return { canceled: true }
+
+  const safeName   = (curationName || 'folder').replace(/[^\w\s\-]/g, '_')
+  const destDir    = path.join(filePaths[0], safeName)
+  fs.mkdirSync(destDir, { recursive: true })
+
+  const mediaDir = db.getMediaDir()
+  let copied = 0
+
+  for (const n of withMedia) {
+    const srcPath  = path.join(mediaDir, n.localPath)
+    const filename = n.localPath.replace(/[\\/]/g, '_')
+    try {
+      fs.copyFileSync(srcPath, path.join(destDir, filename))
+      copied++
+    } catch (_) {}
+  }
+
+  if (!copied) return { error: 'Failed to copy any media files.' }
+
+  return { filePath: destDir }
+})
+
 // ── Export JSON ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 ipcMain.handle('curations:exportJson', async (_e, { curationId, curationName }) => {
   const { rows } = await db.getCuratedNfts(curationId, { limit: 9999 })

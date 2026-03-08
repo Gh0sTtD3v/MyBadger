@@ -16,8 +16,9 @@ export default function Gallery() {
   const [loading,  setLoading]  = useState(true)
   const [page,     setPage]     = useState(0)
   const [selected, setSelected] = useState(null)
-  const [wpStatus,   setWpStatus]   = useState(null)  // null | 'saving' | { ok, msg }
-  const [jsonStatus, setJsonStatus] = useState(null) // null | 'saving' | { ok, msg }
+  const [wpStatus,     setWpStatus]     = useState(null)  // null | 'saving' | { ok, msg }
+  const [jsonStatus,   setJsonStatus]   = useState(null) // null | 'saving' | { ok, msg }
+  const [folderStatus, setFolderStatus] = useState(null) // null | 'saving' | { ok, msg }
 
   function setFilter(patch) {
     setFilterState(prev => ({ ...prev, ...patch }))
@@ -31,6 +32,7 @@ export default function Gallery() {
     setCuration(null)
     setWpStatus(null)
     setJsonStatus(null)
+    setFolderStatus(null)
     Promise.all([
       window.electron.curations.get(curationId),
       window.electron.curated.stats(curationId),
@@ -45,6 +47,15 @@ export default function Gallery() {
     if (res.canceled) { setJsonStatus(null); return }
     if (res.error)    { setJsonStatus({ ok: false, msg: res.error }); return }
     setJsonStatus({ ok: true, msg: res.filePath })
+  }
+
+  async function generateFolder() {
+    if (!window.electron) return
+    setFolderStatus('saving')
+    const res = await window.electron.generateFolder(curationId, curation?.name)
+    if (res.canceled) { setFolderStatus(null); return }
+    if (res.error)    { setFolderStatus({ ok: false, msg: res.error }); return }
+    setFolderStatus({ ok: true, msg: res.filePath })
   }
 
   async function generateWallpaper() {
@@ -92,6 +103,24 @@ export default function Gallery() {
           </span>
         )}
         <div style={{ flex: 1 }} />
+        {folderStatus && typeof folderStatus === 'object' && (
+          <span style={{ fontSize: '10px', color: folderStatus.ok ? '#555' : '#ef4444', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {folderStatus.ok ? `Saved: ${folderStatus.msg}` : folderStatus.msg}
+          </span>
+        )}
+        <button
+          onClick={generateFolder}
+          disabled={folderStatus === 'saving'}
+          style={{
+            padding: '5px 12px', background: 'transparent',
+            border: '1px solid #222', borderRadius: '4px',
+            color: folderStatus === 'saving' ? '#444' : '#555',
+            cursor: folderStatus === 'saving' ? 'not-allowed' : 'pointer',
+            fontSize: '11px', fontFamily: 'monospace', flexShrink: 0,
+          }}
+        >
+          {folderStatus === 'saving' ? 'Saving...' : 'Generate Folder'}
+        </button>
         {wpStatus && typeof wpStatus === 'object' && (
           <span style={{ fontSize: '10px', color: wpStatus.ok ? '#a3e635' : '#ef4444', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {wpStatus.ok ? `Saved: ${wpStatus.msg}` : wpStatus.msg}
