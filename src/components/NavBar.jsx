@@ -89,7 +89,7 @@ export default function NavBar() {
       </div>
 
       {/* Curations list */}
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingTop: '2px', overflowY: 'auto', marginLeft: '24px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingTop: '2px', overflowY: open ? 'auto' : 'hidden', marginLeft: '24px' }}>
         {curations.length === 0 && (
           <span style={{
             padding: '5px 14px 5px 34px',
