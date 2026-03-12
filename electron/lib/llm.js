@@ -11,18 +11,31 @@ let modelsDir   = null
 let initError   = null
 let downloading = false
 
-function modelPath() { return path.join(modelsDir, MODEL_FILE) }
-function isDownloaded() { return !!modelsDir && fs.existsSync(modelPath()) }
+function findModelFile() {
+  if (!modelsDir || !fs.existsSync(modelsDir)) return null
+  function search(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) { const found = search(full); if (found) return found }
+      else if (entry.name.endsWith('.gguf')) return full
+    }
+    return null
+  }
+  return search(modelsDir)
+}
+
+function isDownloaded() { return !!findModelFile() }
 function isReady() { return !!model }
 
 async function initLlm(dataDir) {
   modelsDir = path.join(dataDir, 'models')
-  if (!isDownloaded()) return
+  const found = findModelFile()
+  if (!found) return
 
   try {
     const { getLlama } = await import('node-llama-cpp')
     llama   = await getLlama()
-    model   = await llama.loadModel({ modelPath: modelPath() })
+    model   = await llama.loadModel({ modelPath: found })
     context = await model.createContext({ contextSize: 4096 })
   } catch (err) {
     initError = err.message
@@ -53,26 +66,44 @@ async function downloadModel(onProgress) {
   }
 }
 
-async function extractImageUrl(json) {
+async function extractImageUrl(json, onRaw) {
   if (!model || !context) return null
 
+  const sequence = context.getSequence()
   try {
     const { LlamaChatSession } = await import('node-llama-cpp')
-    const session = new LlamaChatSession({ contextSequence: context.getSequence() })
+    const session = new LlamaChatSession({ contextSequence: sequence })
 
-    const response = await session.prompt(
-      `Extract the primary media URL (image or video) from this NFT metadata JSON.\n` +
-      `Return ONLY the raw URL. If none found, return: null\n\n` +
-      JSON.stringify(json),
-      { maxTokens: 100 }
-    )
+    const prompt =
+      `You are a data extraction tool. Your only job is to find a media URL in an NFT metadata JSON object.\n` +
+      `Rules:\n` +
+      `- Look at fields like: image, image_url, animation_url, animation, media, content, uri\n` +
+      `- Prefer animation_url or animation over image when both exist\n` +
+      `- URLs may start with: https://, http://, ipfs://, ar://\n` +
+      `- Output ONLY the URL — no explanation, no punctuation, no quotes\n` +
+      `- If no URL exists, output only the word: null\n\n` +
+      `JSON:\n${JSON.stringify(json, null, 2)}`
 
-    const url = response.trim().replace(/^["']|["']$/g, '')
-    if (url === 'null' || url === '' ) return null
-    if (!url.startsWith('http') && !url.startsWith('ipfs') && !url.startsWith('ar://')) return null
-    return url
-  } catch {
+    const response = await session.prompt(prompt, { maxTokens: 150 })
+    const raw = response.trim()
+
+    if (onRaw) onRaw(raw)
+
+    // Try regex first — works even if model adds extra words
+    const match = raw.match(/(https?:\/\/[^\s"'<>]+|ipfs:\/\/[^\s"'<>]+|ar:\/\/[^\s"'<>]+)/)
+    if (match) return match[1]
+
+    // Fallback: clean the response and check directly
+    const clean = raw.replace(/^["'`]+|["'`]+$/g, '').split(/\s+/)[0]
+    if (!clean || clean.toLowerCase() === 'null') return null
+    if (clean.startsWith('http') || clean.startsWith('ipfs') || clean.startsWith('ar://')) return clean
+
     return null
+  } catch (err) {
+    if (onRaw) onRaw(`ERROR: ${err.message}`)
+    return null
+  } finally {
+    sequence.dispose?.()
   }
 }
 

@@ -324,6 +324,19 @@ ipcMain.handle('curations:exportJson', async (_e, { curationId, curationName }) 
   return { filePath }
 })
 
+// ── LLM Test ────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ipcMain.handle('llm:test', async (_e, jsonText) => {
+  if (!llm.isReady()) return { error: 'Model not loaded. Download it in Config first.' }
+  try {
+    const parsed = JSON.parse(jsonText)
+    let raw = null
+    const url = await llm.extractImageUrl(parsed, r => { raw = r })
+    return { url, raw }
+  } catch (err) {
+    return { error: err.message }
+  }
+})
+
 // ── Curate ────────────────────────────────────────────────
 ipcMain.handle('curate:run', async (event, { curationId, nftIds }) => {
   try { await runCurate(curationId, nftIds, (p) => send(event, p)) }

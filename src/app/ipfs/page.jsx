@@ -10,9 +10,9 @@ function getSource(nft) {
 }
 
 const SOURCE_COLORS = {
-  ipfs:    { color: '#a3e635', bg: '#1a2a00' },
-  arweave: { color: '#60a5fa', bg: '#001a2a' },
-  http:    { color: '#555',    bg: '#111'    },
+  ipfs:    { color: 'var(--accent)',  bg: 'var(--green-bg)' },
+  arweave: { color: 'var(--blue)',    bg: 'var(--blue-bg)'  },
+  http:    { color: 'var(--text-3)',  bg: 'var(--bg-2)'     },
 }
 
 const FILTERS  = ['all', 'ipfs', 'arweave', 'http', 'pinned', 'unpinned']
@@ -126,76 +126,69 @@ export default function IpfsPage() {
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <h2 style={{ margin: 0, fontSize: '14px', color: '#a3e635' }}>IPFS</h2>
+        <h2 className="page-title">IPFS</h2>
         <div style={{ flex: 1 }} />
         {ipfsStatus && (
-          <span style={{ fontSize: '10px', fontFamily: 'monospace', color: ipfsStatus.running ? '#a3e635' : '#7a3a3a' }}>
+          <span style={{ fontSize: '13px', color: ipfsStatus.running ? 'var(--accent)' : 'var(--red)', fontVariantNumeric: 'tabular-nums' }}>
             {ipfsStatus.running ? `● node running · ${ipfsStatus.peers} peers` : '● node offline'}
           </span>
         )}
       </div>
 
       {/* Source filter pills */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
         {FILTERS.map(f => (
           <button key={f} onClick={() => setFilter(f)} style={{
-            padding: '3px 10px', background: filter === f ? '#1a3a00' : '#111',
-            border: `1px solid ${filter === f ? '#4a7a10' : '#222'}`, borderRadius: '12px',
-            color: filter === f ? '#a3e635' : '#555', fontSize: '10px', fontFamily: 'monospace', cursor: 'pointer',
+            padding: '3px 12px',
+            background: filter === f ? 'var(--accent-lo)' : 'transparent',
+            border: `1px solid ${filter === f ? 'var(--accent-bdr)' : 'var(--border)'}`,
+            borderRadius: '20px',
+            color: filter === f ? 'var(--accent)' : 'var(--text-3)',
+            fontSize: '12px', cursor: 'pointer',
+            fontFamily: 'var(--font-ui)',
+            transition: 'all var(--ease)',
           }}>{f}</button>
         ))}
       </div>
 
       {/* Chain / wallet / search + actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-        <select value={chainFilter} onChange={e => { setChainFilter(e.target.value); setPage(0) }} style={selectStyle}>
+        <select value={chainFilter} onChange={e => { setChainFilter(e.target.value); setPage(0) }} className="input" style={{ fontSize: '13px' }}>
           <option value="">All chains</option>
           {chains.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select value={walletFilter} onChange={e => { setWalletFilter(e.target.value); setPage(0) }} style={{ ...selectStyle, maxWidth: '140px' }}>
+        <select value={walletFilter} onChange={e => { setWalletFilter(e.target.value); setPage(0) }} className="input" style={{ fontSize: '13px', maxWidth: '140px' }}>
           <option value="">All wallets</option>
           {wallets.map(w => <option key={w} value={w}>{w}</option>)}
         </select>
         <input
-          type="text" placeholder="Search..." value={search}
+          type="text" placeholder="Search…" value={search}
           onChange={e => { setSearch(e.target.value); setPage(0) }}
-          style={{ ...selectStyle, width: '140px' }}
+          className="input"
+          style={{ width: '140px', fontSize: '13px' }}
         />
         <div style={{ flex: 1 }} />
         {selected.size > 0 && (
-          <button onClick={() => setSelected(new Set())} style={ghostBtn}>Deselect all</button>
+          <button onClick={() => setSelected(new Set())} className="btn btn-ghost">Deselect all</button>
         )}
-        <button onClick={selectAllIpfs} style={ghostBtn}>Select IPFS</button>
+        <button onClick={selectAllIpfs} className="btn btn-ghost">Select IPFS</button>
         {canUnpin && (
-          <button
-            onClick={unpinSelected}
-            disabled={!canUnpin}
-            style={{
-              padding: '6px 14px', background: '#3a0a0a',
-              color: '#f87171', border: '1px solid #5a1a1a', borderRadius: '4px',
-              cursor: 'pointer', fontSize: '12px', fontFamily: 'monospace',
-            }}
-          >
-            {unpinning ? 'Unpinning...' : 'Unpin'}
+          <button onClick={unpinSelected} disabled={!canUnpin} className="btn btn-danger">
+            {unpinning ? 'Unpinning…' : 'Unpin'}
           </button>
         )}
         <button
           onClick={pinSelected}
           disabled={!canPin}
-          style={{
-            padding: '6px 14px', background: canPin ? '#16a34a' : '#111',
-            color: '#fff', border: 'none', borderRadius: '4px',
-            cursor: canPin ? 'pointer' : 'not-allowed',
-            fontSize: '12px', fontFamily: 'monospace',
-            opacity: canPin ? 1 : 0.4,
-          }}
+          className="btn btn-primary"
+          style={{ opacity: canPin ? 1 : 0.35 }}
         >
-          {pinning ? 'Pinning...' : `Pin${selected.size ? ` (${selected.size})` : ''}`}
+          {pinning ? 'Pinning…' : `Pin${selected.size ? ` (${selected.size})` : ''}`}
         </button>
       </div>
 
       {/* List */}
-      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1px' }}>
         {filtered.map(nft => {
           const source     = getSource(nft)
           const sc         = SOURCE_COLORS[source]
@@ -204,39 +197,38 @@ export default function IpfsPage() {
           return (
             <div key={nft.id} onClick={() => toggleSelect(nft.id)} style={{
               display: 'flex', alignItems: 'center', gap: '10px',
-              padding: '6px 8px', borderRadius: '4px', cursor: 'pointer',
-              background: isSelected ? '#0f1f00' : 'transparent',
-              transition: 'background 0.1s',
+              padding: '8px 10px', borderRadius: 'var(--r2)', cursor: 'pointer',
+              background: isSelected ? 'var(--accent-xlo)' : 'transparent',
+              borderLeft: isSelected ? '2px solid var(--accent-bdr)' : '2px solid transparent',
+              transition: 'background var(--ease)',
             }}>
               <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(nft.id)}
                 onClick={e => e.stopPropagation()}
-                style={{ accentColor: '#a3e635', cursor: 'pointer', flexShrink: 0 }} />
+                style={{ accentColor: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }} />
 
               {thumb && (
                 <img src={thumb} alt=""
-                  style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '3px', flexShrink: 0 }}
+                  style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: 'var(--r2)', flexShrink: 0 }}
                   onError={e => { e.target.style.display = 'none' }} />
               )}
 
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '12px', color: '#d4d4d4', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: '14px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {nft.name || nft.contract?.name || 'Unnamed'}
                 </div>
                 {nft.cid && (
-                  <div style={{ fontSize: '9px', color: '#2a4a10', fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--accent)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
                     {nft.cid}
                   </div>
                 )}
               </div>
 
-              <span style={{ fontSize: '9px', color: '#2a2a2a', flexShrink: 0 }}>{nft.chain}</span>
-              <span style={{ fontSize: '9px', color: sc.color, background: sc.bg, padding: '1px 6px', borderRadius: '8px', flexShrink: 0 }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: '9px', fontWeight: 600, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>{nft.chain}</span>
+              <span style={{ fontSize: '11px', color: sc.color, background: sc.bg, padding: '2px 8px', borderRadius: '20px', flexShrink: 0 }}>
                 {source}
               </span>
               {nft.cid && (
-                <span style={{ fontSize: '9px', color: '#a3e635', background: '#1a3a00', padding: '1px 6px', borderRadius: '8px', flexShrink: 0 }}>
-                  pinned
-                </span>
+                <span className="badge badge-green" style={{ flexShrink: 0 }}>pinned</span>
               )}
             </div>
           )
@@ -245,23 +237,19 @@ export default function IpfsPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#555', paddingTop: '8px', borderTop: '1px solid #1a1a1a' }}>
-          <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={pageBtn}>prev</button>
-          <span>{page + 1} / {totalPages}</span>
-          <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} style={pageBtn}>next</button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center', fontSize: '13px', color: 'var(--text-3)', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+          <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="btn btn-ghost" style={{ padding: '4px 14px', fontSize: '13px' }}>prev</button>
+          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{page + 1} / {totalPages}</span>
+          <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="btn btn-ghost" style={{ padding: '4px 14px', fontSize: '13px' }}>next</button>
         </div>
       )}
 
       {/* Log */}
       {logs.length > 0 && (
-        <div style={{ maxHeight: '80px', overflowY: 'auto', fontSize: '10px', color: '#555', lineHeight: '1.6', fontFamily: 'monospace' }}>
+        <div style={{ maxHeight: '80px', overflowY: 'auto', fontSize: '11px', color: 'var(--text-3)', lineHeight: '1.7', fontFamily: 'var(--font-mono)', background: 'var(--bg-1)', borderRadius: 'var(--r1)', padding: '8px 12px' }}>
           {logs.map((l, i) => <div key={i}>{l}</div>)}
         </div>
       )}
     </div>
   )
 }
-
-const selectStyle = { padding: '6px 10px', background: '#111', border: '1px solid #222', borderRadius: '4px', color: '#e5e5e5', fontSize: '12px', fontFamily: 'monospace', outline: 'none' }
-const ghostBtn    = { padding: '6px 12px', background: 'transparent', border: '1px solid #222', borderRadius: '4px', color: '#555', cursor: 'pointer', fontSize: '11px', fontFamily: 'monospace' }
-const pageBtn     = { padding: '3px 10px', background: '#111', border: '1px solid #222', borderRadius: '4px', color: '#555', cursor: 'pointer', fontSize: '11px', fontFamily: 'monospace' }

@@ -34,10 +34,8 @@ export default function Contracts() {
     if (!window.electron || !apiKey.trim()) return
     const valid = contracts.filter(c => c.address.trim())
     if (!valid.length) return
-
     setScanning(true)
     setLogs([])
-
     window.electron.onEvent((payload) => {
       if (payload.type === 'done' || payload.type === 'error') {
         setScanning(false)
@@ -46,7 +44,6 @@ export default function Contracts() {
       }
       setLogs(prev => [...prev, payload.message])
     })
-
     await window.electron.runContract(apiKey.trim(), valid.map(c => ({ address: c.address.trim(), chain: c.chain })))
   }
 
@@ -59,9 +56,9 @@ export default function Contracts() {
   return (
     <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', height: '100%', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h2 style={{ margin: 0, fontSize: '14px', color: '#a3e635' }}>Contracts</h2>
+        <h2 className="page-title">Contracts</h2>
         {rawCount !== null && (
-          <span style={{ fontSize: '11px', color: '#444' }}>{rawCount} NFTs in raw index</span>
+          <span style={{ fontSize: '12px', color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>{rawCount} NFTs indexed</span>
         )}
       </div>
 
@@ -70,42 +67,37 @@ export default function Contracts() {
           <div key={i} style={{ display: 'flex', gap: '6px' }}>
             <input
               type="text"
-              placeholder="0x contract address..."
+              placeholder="0x contract address…"
               value={c.address}
               onChange={e => set(i, { address: e.target.value })}
-              style={inputStyle}
+              className="input"
+              style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '13px' }}
             />
             <select
               value={c.chain}
               onChange={e => set(i, { chain: e.target.value })}
-              style={selectStyle}
+              className="input"
+              style={{ fontSize: '13px', flexShrink: 0 }}
             >
               {CHAINS.map(ch => <option key={ch.key} value={ch.key}>{ch.label}</option>)}
             </select>
-            <button onClick={() => remove(i)} style={removeBtnStyle}>×</button>
+            <button onClick={() => remove(i)} className="btn btn-ghost" style={{ padding: '0 14px', fontSize: '18px', lineHeight: 1 }}>×</button>
           </div>
         ))}
-        <button onClick={add} style={addBtnStyle}>+ Add contract</button>
+        <button onClick={add} className="btn btn-ghost" style={{ alignSelf: 'flex-start' }}>+ Add contract</button>
       </div>
 
       <button
         onClick={scan}
         disabled={!canScan}
-        style={{
-          alignSelf: 'flex-start',
-          padding: '8px 18px',
-          background: scanning ? '#1a3a00' : '#16a34a',
-          color: '#fff', border: 'none', borderRadius: '4px',
-          cursor: canScan ? 'pointer' : 'not-allowed',
-          fontSize: '12px', fontFamily: 'monospace',
-          opacity: canScan ? 1 : 0.4,
-        }}
+        className="btn btn-primary"
+        style={{ alignSelf: 'flex-start', padding: '8px 20px', fontSize: '14px', opacity: canScan ? 1 : 0.35 }}
       >
-        {scanning ? 'Scanning...' : 'Scan Contracts'}
+        {scanning ? 'Scanning…' : 'Scan Contracts'}
       </button>
 
       {logs.length > 0 && (
-        <div style={{ flex: 1, background: '#0d0d0d', borderRadius: '6px', padding: '12px', overflowY: 'auto', fontSize: '11px', lineHeight: '1.7', color: '#d4d4d4' }}>
+        <div style={{ flex: 1, background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: '12px', overflowY: 'auto', fontSize: '12px', lineHeight: '1.8', color: 'var(--text-2)', fontFamily: 'var(--font-mono)' }}>
           {logs.map((l, i) => <div key={i}>{l}</div>)}
           <div ref={logEndRef} />
         </div>
@@ -113,8 +105,3 @@ export default function Contracts() {
     </div>
   )
 }
-
-const inputStyle    = { flex: 1, padding: '7px 10px', background: '#111', border: '1px solid #222', borderRadius: '4px', color: '#e5e5e5', fontSize: '12px', fontFamily: 'monospace', outline: 'none' }
-const selectStyle   = { padding: '7px 10px', background: '#111', border: '1px solid #222', borderRadius: '4px', color: '#e5e5e5', fontSize: '12px', fontFamily: 'monospace', outline: 'none', flexShrink: 0 }
-const removeBtnStyle = { padding: '0 12px', background: '#111', border: '1px solid #222', borderRadius: '4px', color: '#555', cursor: 'pointer', fontSize: '16px', lineHeight: 1 }
-const addBtnStyle   = { alignSelf: 'flex-start', padding: '5px 12px', background: 'transparent', border: '1px solid #222', borderRadius: '4px', color: '#555', cursor: 'pointer', fontSize: '11px', fontFamily: 'monospace' }

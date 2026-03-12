@@ -39,10 +39,8 @@ export default function Wallets() {
     if (!window.electron || !apiKey.trim()) return
     const valid = wallets.filter(w => w.address?.trim() && w.chains?.length)
     if (!valid.length) return
-
     setScanning(true)
     setLogs([])
-
     window.electron.onEvent((payload) => {
       if (payload.type === 'done' || payload.type === 'error') {
         setScanning(false)
@@ -51,7 +49,6 @@ export default function Wallets() {
       }
       setLogs(prev => [...prev, payload.message])
     })
-
     await window.electron.raw.clear()
     await window.electron.runAlchemy(apiKey.trim(), valid.map(w => ({ address: w.address.trim(), chains: w.chains })))
   }
@@ -76,37 +73,39 @@ export default function Wallets() {
   return (
     <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', height: '100%', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h2 style={{ margin: 0, fontSize: '14px', color: '#a3e635' }}>Wallets</h2>
+        <h2 className="page-title">Wallets</h2>
         {rawCount !== null && (
-          <span style={{ fontSize: '11px', color: '#444' }}>{rawCount} NFTs in raw index</span>
+          <span style={{ fontSize: '12px', color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>{rawCount} NFTs indexed</span>
         )}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '560px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '560px' }}>
         {wallets.map((w, i) => (
-          <div key={i} style={{ background: '#0d0d0d', border: '1px solid #1c1c1c', borderRadius: '6px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div key={i} style={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', gap: '6px' }}>
               <input
                 type="text"
-                placeholder="wallet address..."
+                placeholder="wallet address…"
                 value={w.address}
                 onChange={e => setAddress(i, e.target.value)}
-                style={inputStyle}
+                className="input"
+                style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '13px' }}
               />
-              <button onClick={() => remove(i)} style={removeBtnStyle}>×</button>
+              <button onClick={() => remove(i)} className="btn btn-ghost" style={{ padding: '0 14px', fontSize: '18px', lineHeight: 1 }}>×</button>
             </div>
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               {CHAINS.map(({ key, label }) => (
                 <label key={key} style={{
                   display: 'flex', alignItems: 'center', gap: '5px',
-                  cursor: 'pointer', fontSize: '11px',
-                  color: w.chains.includes(key) ? '#e5e5e5' : '#444',
+                  cursor: 'pointer', fontSize: '13px',
+                  color: w.chains.includes(key) ? 'var(--text)' : 'var(--text-3)',
+                  transition: 'color var(--ease)',
                 }}>
                   <input
                     type="checkbox"
                     checked={w.chains.includes(key)}
                     onChange={() => toggleChain(i, key)}
-                    style={{ accentColor: '#a3e635', cursor: 'pointer' }}
+                    style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
                   />
                   {label}
                 </label>
@@ -114,27 +113,20 @@ export default function Wallets() {
             </div>
           </div>
         ))}
-        <button onClick={add} style={addBtnStyle}>+ Add wallet</button>
+        <button onClick={add} className="btn btn-ghost" style={{ alignSelf: 'flex-start' }}>+ Add wallet</button>
       </div>
 
       <button
         onClick={scanWallets}
         disabled={!canScan}
-        style={{
-          alignSelf: 'flex-start',
-          padding: '8px 18px',
-          background: scanning ? '#1a3a00' : '#16a34a',
-          color: '#fff', border: 'none', borderRadius: '4px',
-          cursor: canScan ? 'pointer' : 'not-allowed',
-          fontSize: '12px', fontFamily: 'monospace',
-          opacity: canScan ? 1 : 0.4,
-        }}
+        className="btn btn-primary"
+        style={{ alignSelf: 'flex-start', padding: '8px 20px', fontSize: '14px', opacity: canScan ? 1 : 0.35 }}
       >
-        {scanning ? 'Scanning...' : 'Scan Wallets'}
+        {scanning ? 'Scanning…' : 'Scan Wallets'}
       </button>
 
       {logs.length > 0 && (
-        <div style={{ flex: 1, background: '#0d0d0d', borderRadius: '6px', padding: '12px', overflowY: 'auto', fontSize: '11px', lineHeight: '1.7', color: '#d4d4d4' }}>
+        <div style={{ flex: 1, background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: '12px', overflowY: 'auto', fontSize: '12px', lineHeight: '1.8', color: 'var(--text-2)', fontFamily: 'var(--font-mono)' }}>
           {logs.map((l, i) => <div key={i}>{l}</div>)}
           <div ref={logEndRef} />
         </div>
@@ -142,7 +134,3 @@ export default function Wallets() {
     </div>
   )
 }
-
-const inputStyle     = { flex: 1, padding: '7px 10px', background: '#111', border: '1px solid #222', borderRadius: '4px', color: '#e5e5e5', fontSize: '12px', fontFamily: 'monospace', outline: 'none' }
-const removeBtnStyle = { padding: '0 12px', background: '#111', border: '1px solid #222', borderRadius: '4px', color: '#555', cursor: 'pointer', fontSize: '16px', lineHeight: 1 }
-const addBtnStyle    = { alignSelf: 'flex-start', padding: '5px 12px', background: 'transparent', border: '1px solid #222', borderRadius: '4px', color: '#555', cursor: 'pointer', fontSize: '11px', fontFamily: 'monospace' }

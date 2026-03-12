@@ -39,114 +39,87 @@ export default function Config() {
   }
 
   return (
-    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '480px' }}>
-      <h2 style={{ margin: 0, fontSize: '14px', color: '#a3e635' }}>Config</h2>
+    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '460px' }}>
+      <h2 className="page-title">Config</h2>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <label style={labelStyle}>API Key</label>
+      <Field label="API Key">
         <input
           type="password"
           placeholder="Enter Alchemy API key"
           value={apiKey}
           onChange={e => setApiKey(e.target.value)}
-          style={inputStyle}
+          className="input"
+          style={{ width: '100%' }}
         />
-      </div>
+      </Field>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <label style={labelStyle}>Media Folder</label>
+      <Field label="Media Folder">
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <div style={{ ...inputStyle, flex: 1, color: mediaDir ? '#888' : '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div className="input" style={{ flex: 1, color: mediaDir ? 'var(--text-2)' : 'var(--text-4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '13px', fontFamily: mediaDir ? 'var(--font-mono)' : 'var(--font-ui)' }}>
             {mediaDir || 'default'}
           </div>
-          <button onClick={browseFolder} style={browseBtn}>Browse</button>
+          <button onClick={browseFolder} className="btn btn-ghost">Browse</button>
         </div>
-      </div>
+      </Field>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <label style={labelStyle}>AI Model (Phi-3.5 Mini · ~2GB)</label>
-        <div style={{ fontSize: '11px', fontFamily: 'monospace', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <Field label="AI Model · Phi-3.5 Mini (~2 GB)">
+        <div style={{ fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {llmStatus === null ? (
-            <span style={{ color: '#333' }}>loading...</span>
+            <span style={{ color: 'var(--text-4)' }}>loading…</span>
           ) : llmStatus.ready ? (
-            <span style={{ color: '#a3e635' }}>● ready</span>
+            <span style={{ color: 'var(--accent)' }}>● ready</span>
           ) : llmStatus.downloaded ? (
-            <span style={{ color: '#60a5fa' }}>● downloaded · loading...</span>
+            <span style={{ color: 'var(--blue)' }}>● downloaded · loading…</span>
           ) : (
             <>
-              <span style={{ color: '#555' }}>● not downloaded</span>
+              <span style={{ color: 'var(--text-3)' }}>● not downloaded</span>
               {llmProgress ? (
                 llmProgress.error ? (
-                  <span style={{ color: '#ef4444' }}>{llmProgress.error}</span>
+                  <span style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{llmProgress.error}</span>
                 ) : llmProgress.total > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div style={{ height: '3px', background: '#1a1a1a', borderRadius: '2px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${(llmProgress.downloaded / llmProgress.total) * 100}%`, background: '#60a5fa', transition: 'width 0.3s ease' }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ height: '2px', background: 'var(--bg-3)', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${(llmProgress.downloaded / llmProgress.total) * 100}%`, background: 'var(--blue)', transition: 'width 0.3s ease' }} />
                     </div>
-                    <span style={{ color: '#444', fontSize: '10px' }}>
+                    <span style={{ color: 'var(--text-3)', fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>
                       {(llmProgress.downloaded / 1e6).toFixed(0)} / {(llmProgress.total / 1e6).toFixed(0)} MB
                     </span>
                   </div>
                 ) : (
-                  <span style={{ color: '#444' }}>connecting...</span>
+                  <span style={{ color: 'var(--text-3)' }}>connecting…</span>
                 )
               ) : (
-                <button onClick={downloadModel} style={browseBtn}>Download</button>
+                <button onClick={downloadModel} className="btn btn-ghost" style={{ alignSelf: 'flex-start' }}>Download</button>
               )}
             </>
           )}
         </div>
-      </div>
+      </Field>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <label style={labelStyle}>IPFS Node</label>
-        <div style={{ fontSize: '11px', fontFamily: 'monospace', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <Field label="IPFS Node">
+        <div style={{ fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {ipfsStatus === null ? (
-            <span style={{ color: '#333' }}>loading...</span>
+            <span style={{ color: 'var(--text-4)' }}>loading…</span>
           ) : ipfsStatus.running ? (
             <>
-              <span style={{ color: '#a3e635' }}>● running</span>
-              <span style={{ color: '#444', wordBreak: 'break-all' }}>{ipfsStatus.peerId}</span>
-              <span style={{ color: '#333' }}>{ipfsStatus.peers} peers</span>
+              <span style={{ color: 'var(--accent)' }}>● running</span>
+              <span style={{ color: 'var(--text-3)', wordBreak: 'break-all', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{ipfsStatus.peerId}</span>
+              <span style={{ color: 'var(--text-3)' }}>{ipfsStatus.peers} peers</span>
             </>
           ) : (
-            <span style={{ color: '#7a3a3a' }}>● offline{ipfsStatus.error ? ` — ${ipfsStatus.error}` : ''}</span>
+            <span style={{ color: 'var(--red)' }}>● offline{ipfsStatus.error ? ` — ${ipfsStatus.error}` : ''}</span>
           )}
         </div>
-      </div>
-
+      </Field>
     </div>
   )
 }
 
-const labelStyle = {
-  fontSize: '10px',
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  color: '#444',
-}
-
-const browseBtn = {
-  padding: '7px 14px',
-  background: 'transparent',
-  border: '1px solid #222',
-  borderRadius: '4px',
-  color: '#555',
-  cursor: 'pointer',
-  fontSize: '12px',
-  fontFamily: 'monospace',
-  flexShrink: 0,
-}
-
-const inputStyle = {
-  padding: '7px 10px',
-  background: '#111',
-  border: '1px solid #222',
-  borderRadius: '4px',
-  color: '#e5e5e5',
-  fontSize: '12px',
-  fontFamily: 'monospace',
-  outline: 'none',
-  width: '100%',
-  boxSizing: 'border-box',
+function Field({ label, children }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <label className="section-label">{label}</label>
+      {children}
+    </div>
+  )
 }

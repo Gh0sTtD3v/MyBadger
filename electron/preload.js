@@ -49,10 +49,11 @@ contextBridge.exposeInMainWorld('electron', {
 
   // LLM
   llm: {
-    status:          ()   => invoke('llm:status'),
-    download:        ()   => invoke('llm:download'),
-    onEvent:         (cb) => ipcRenderer.on('llm-event', (_e, p) => cb(p)),
-    removeListeners: ()   => ipcRenderer.removeAllListeners('llm-event'),
+    status:          ()         => invoke('llm:status'),
+    download:        ()         => invoke('llm:download'),
+    test:            (jsonText) => invoke('llm:test', jsonText),
+    onEvent:         (cb)       => ipcRenderer.on('llm-event', (_e, p) => cb(p)),
+    removeListeners: ()         => ipcRenderer.removeAllListeners('llm-event'),
   },
 
   // IPFS

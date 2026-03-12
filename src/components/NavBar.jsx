@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { useCurations } from '../context/CurationsContext'
 
 const W_CLOSED = 52
-const W_OPEN   = 200
+const W_OPEN   = 210
 
 export default function NavBar() {
   const [open, setOpen] = useState(false)
@@ -24,25 +24,47 @@ export default function NavBar() {
   }, [open])
 
   return (
-    <nav ref={navRef} onClick={() => setOpen(o => !o)} style={{
+    <nav ref={navRef} style={{
       width: open ? W_OPEN : W_CLOSED,
       minWidth: open ? W_OPEN : W_CLOSED,
       height: '100vh',
-      background: '#0d0d0d',
-      borderRight: '1px solid #1c1c1c',
+      background: 'var(--bg-1)',
+      borderRight: '1px solid var(--border)',
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
-      transition: 'width 0.22s cubic-bezier(0.4,0,0.2,1), min-width 0.22s cubic-bezier(0.4,0,0.2,1)',
+      transition: `width var(--slide), min-width var(--slide)`,
       flexShrink: 0,
       userSelect: 'none',
-      cursor: 'pointer',
     }}>
 
       {/* Hamburger */}
-      <button style={triggerStyle} title="Menu">
+      <button
+        title="Menu"
+        aria-label="Toggle menu"
+        onClick={() => setOpen(v => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '12px',
+          padding: '14px 0 14px 17px',
+          color: open ? 'var(--text-2)' : 'var(--text-3)',
+          background: 'none', border: 'none',
+          cursor: 'pointer', width: '100%',
+          textAlign: 'left', whiteSpace: 'nowrap', flexShrink: 0,
+          transition: 'color var(--ease)',
+        }}
+      >
         <HamburgerIcon />
-        <span style={labelStyle(open)}>Menu</span>
+        <span style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: '11px', fontWeight: 700,
+          letterSpacing: '0.14em', textTransform: 'uppercase',
+          color: 'var(--text-3)',
+          opacity: open ? 1 : 0,
+          maxWidth: open ? '140px' : '0px',
+          overflow: 'hidden',
+          transition: `max-width var(--slide), opacity var(--ease)`,
+          pointerEvents: 'none',
+        }}>Menu</span>
       </button>
 
       {/* Curations list */}
@@ -50,117 +72,103 @@ export default function NavBar() {
         {curations.length === 0 && (
           <span style={{
             padding: '5px 14px 5px 34px',
-            fontSize: '11px',
+            fontSize: '12px',
             opacity: open ? 1 : 0,
             maxHeight: open ? '32px' : '0px',
             overflow: 'hidden',
-            color: '#2a2a2a',
-            transition: 'max-height 0.22s cubic-bezier(0.4,0,0.2,1), opacity 0.18s ease',
+            color: 'var(--text-4)',
+            transition: `max-height var(--slide), opacity var(--ease)`,
           }}>
             no curations
           </span>
         )}
         {curations.map(c => (
-          <SubLink key={c._id} href={`/gallery/${c._id}`} label={c.name} active={pathname === `/gallery/${c._id}`} open={open} />
+          <SubLink
+            key={c._id}
+            href={`/gallery/${c._id}`}
+            label={c.name}
+            active={pathname === `/gallery/${c._id}`}
+            open={open}
+            onClick={() => setOpen(true)}
+          />
         ))}
       </div>
 
       {/* Divider */}
-      <div style={{ height: '1px', background: '#1c1c1c', margin: '0 14px' }} />
+      <div style={{ height: '1px', background: 'var(--border)', margin: '0 12px' }} />
 
       {/* Bottom icon links */}
-      <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: '8px', paddingTop: '4px' }}>
-        <NavIconLink href="/indexer" label="Indexer" active={pathname === '/indexer'} open={open}>
-          <IndexerIcon />
-        </NavIconLink>
-        <NavIconLink href="/ipfs" label="IPFS" active={pathname === '/ipfs'} open={open}>
-          <IpfsIcon />
-        </NavIconLink>
-        <NavIconLink href="/wallets" label="Wallets" active={pathname === '/wallets'} open={open}>
-          <WalletIcon />
-        </NavIconLink>
-        <NavIconLink href="/contracts" label="Contracts" active={pathname === '/contracts'} open={open}>
-          <ContractIcon />
-        </NavIconLink>
-        <NavIconLink href="/config" label="Config" active={pathname === '/config'} open={open}>
-          <AlchemyIcon />
-        </NavIconLink>
-        <NavIconLink href="/info" label="Info" active={pathname === '/info'} open={open}>
-          <InfoIcon />
-        </NavIconLink>
+      <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: '10px', paddingTop: '4px' }}>
+        <NavIconLink href="/indexer"   label="Curate"    active={pathname === '/indexer'}   open={open} onClick={() => setOpen(true)}><IndexerIcon /></NavIconLink>
+        <NavIconLink href="/ipfs"      label="IPFS"      active={pathname === '/ipfs'}      open={open} onClick={() => setOpen(true)}><IpfsIcon /></NavIconLink>
+        <NavIconLink href="/wallets"   label="Wallets"   active={pathname === '/wallets'}   open={open} onClick={() => setOpen(true)}><WalletIcon /></NavIconLink>
+        <NavIconLink href="/contracts" label="Contracts" active={pathname === '/contracts'} open={open} onClick={() => setOpen(true)}><ContractIcon /></NavIconLink>
+        <NavIconLink href="/config"    label="Config"    active={pathname === '/config'}    open={open} onClick={() => setOpen(true)}><AlchemyIcon /></NavIconLink>
+        <NavIconLink href="/info"      label="Info"      active={pathname === '/info'}      open={open} onClick={() => setOpen(true)}><InfoIcon /></NavIconLink>
+        <NavIconLink href="/dev"       label="Dev"       active={pathname === '/dev'}       open={open} onClick={() => setOpen(true)}><DevIcon /></NavIconLink>
       </div>
 
     </nav>
   )
 }
 
-function SubLink({ href, label, active, open }) {
+function SubLink({ href, label, active, open, onClick }) {
   return (
     <Link href={href} style={{
       display: 'block',
       padding: '5px 14px 5px 34px',
-      color: active ? '#a3e635' : '#3a3a3a',
+      color: active ? 'var(--accent)' : 'var(--text-3)',
       textDecoration: 'none',
-      fontSize: '12px',
+      fontSize: '13px',
+      fontWeight: active ? 500 : 400,
       whiteSpace: 'nowrap',
       opacity: open ? 1 : 0,
       maxHeight: open ? '32px' : '0px',
       overflow: 'hidden',
-      transition: 'max-height 0.22s cubic-bezier(0.4,0,0.2,1), opacity 0.18s ease, color 0.15s ease',
+      transition: `max-height var(--slide), opacity var(--ease), color var(--ease)`,
       pointerEvents: open ? 'auto' : 'none',
-      letterSpacing: '0.02em',
-    }}>
+      letterSpacing: '0.01em',
+      background: active ? 'var(--accent-xlo)' : 'transparent',
+      borderLeft: `2px solid ${active ? 'var(--accent)' : 'transparent'}`,
+      marginLeft: '1px',
+    }} onClick={onClick}>
       {label}
     </Link>
   )
 }
 
-function NavIconLink({ href, label, active, open, children }) {
+function NavIconLink({ href, label, active, open, children, onClick }) {
   return (
     <Link href={href} style={{
       display: 'flex',
       alignItems: 'center',
       gap: '12px',
-      padding: '9px 0 9px 17px',
-      color: active ? '#a3e635' : '#555',
+      padding: '9px 0 9px 16px',
+      color: active ? 'var(--accent)' : 'var(--text-3)',
       textDecoration: 'none',
       whiteSpace: 'nowrap',
-      transition: 'color 0.15s ease',
-    }}>
+      transition: `color var(--ease)`,
+      borderLeft: `2px solid ${active ? 'var(--accent)' : 'transparent'}`,
+      background: active ? 'var(--accent-xlo)' : 'transparent',
+      marginLeft: '1px',
+    }} onClick={onClick}>
       {children}
       <span style={{
+        fontFamily: 'var(--font-display)',
         fontSize: '11px',
-        letterSpacing: '0.08em',
+        fontWeight: active ? 700 : 600,
+        letterSpacing: '0.1em',
         textTransform: 'uppercase',
-        color: active ? '#a3e635' : '#444',
+        color: active ? 'var(--accent)' : 'var(--text-3)',
         opacity: open ? 1 : 0,
-        maxWidth: open ? '150px' : '0px',
+        maxWidth: open ? '140px' : '0px',
         overflow: 'hidden',
-        transition: 'max-width 0.22s cubic-bezier(0.4,0,0.2,1), opacity 0.18s ease',
+        transition: `max-width var(--slide), opacity var(--ease)`,
       }}>
         {label}
       </span>
     </Link>
   )
-}
-
-const triggerStyle = {
-  display: 'flex', alignItems: 'center', gap: '12px',
-  padding: '12px 0 12px 17px',
-  color: '#555', background: 'none', border: 'none',
-  cursor: 'pointer', width: '100%', textAlign: 'left', whiteSpace: 'nowrap',
-}
-
-function labelStyle(open) {
-  return {
-    fontSize: '11px', letterSpacing: '0.08em', textTransform: 'uppercase',
-    color: '#444',
-    opacity: open ? 1 : 0,
-    maxWidth: open ? '150px' : '0px',
-    overflow: 'hidden',
-    transition: 'max-width 0.22s cubic-bezier(0.4,0,0.2,1), opacity 0.18s ease',
-    pointerEvents: 'none',
-  }
 }
 
 function HamburgerIcon() {
@@ -233,6 +241,16 @@ function IpfsIcon() {
       <path d="M9 3 L14.2 6 L9 9 L3.8 6 Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
       <path d="M3.8 6 L9 9 L9 15 L3.8 12 Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
       <path d="M9 9 L14.2 6 L14.2 12 L9 15 Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function DevIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
+      <polyline points="4,6 2,9 4,12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="14,6 16,9 14,12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="11" y1="4" x2="7" y2="14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   )
 }

@@ -10,17 +10,17 @@ const DONATIONS = [
 
 export default function Info() {
   return (
-    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', fontSize: '12px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <h2 style={{ margin: 0, fontSize: '14px', color: '#a3e635' }}>About</h2>
+    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <h2 className="page-title">About</h2>
         <Row label="Name"    value={pkg.name} />
         <Row label="Version" value={pkg.version} />
         <Row label="Author"  value={pkg.author ?? '—'} />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <h2 style={{ margin: 0, fontSize: '14px', color: '#a3e635' }}>Donate</h2>
-        <p style={{ margin: 0, color: '#444', fontSize: '11px' }}>If this tool helped you, consider buying me a coffee.</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <h2 className="page-title">Donate</h2>
+        <p style={{ margin: 0, color: 'var(--text-3)', fontSize: '14px' }}>If this tool helped you, consider buying me a coffee.</p>
         {DONATIONS.map(({ chain, address }) => (
           <DonationRow key={chain} chain={chain} address={address} />
         ))}
@@ -39,21 +39,17 @@ function DonationRow({ chain, address }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      <span style={{ color: '#555', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{chain}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+      <span className="section-label">{chain}</span>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{ color: '#ccc', fontFamily: 'monospace', fontSize: '11px', wordBreak: 'break-all' }}>{address}</span>
-        <button onClick={copy} style={{
+        <span style={{ color: 'var(--text-2)', fontFamily: 'var(--font-mono)', fontSize: '13px', wordBreak: 'break-all' }}>{address}</span>
+        <button onClick={copy} className="btn btn-ghost" style={{
           flexShrink: 0,
-          padding: '3px 10px',
-          background: copied ? '#1a3a00' : '#111',
-          border: `1px solid ${copied ? '#4a7a10' : '#222'}`,
-          borderRadius: '4px',
-          color: copied ? '#a3e635' : '#555',
-          fontSize: '10px',
-          fontFamily: 'monospace',
-          cursor: 'pointer',
-          transition: 'all 0.15s ease',
+          padding: '4px 12px',
+          fontSize: '12px',
+          color: copied ? 'var(--accent)' : 'var(--text-3)',
+          borderColor: copied ? 'var(--accent-bdr)' : 'var(--border)',
+          transition: 'all var(--ease)',
         }}>
           {copied ? 'copied' : 'copy'}
         </button>
@@ -64,9 +60,9 @@ function DonationRow({ chain, address }) {
 
 function Row({ label, value }) {
   return (
-    <div style={{ display: 'flex', gap: '16px' }}>
-      <span style={{ color: '#444', width: '64px' }}>{label}</span>
-      <span style={{ color: '#ccc' }}>{value}</span>
+    <div style={{ display: 'flex', gap: '20px', alignItems: 'baseline' }}>
+      <span className="section-label" style={{ width: '60px', flexShrink: 0 }}>{label}</span>
+      <span style={{ color: 'var(--text-2)', fontSize: '14px' }}>{value}</span>
     </div>
   )
 }
