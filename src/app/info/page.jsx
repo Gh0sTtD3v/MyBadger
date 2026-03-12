@@ -4,8 +4,8 @@ import { useState } from 'react'
 import pkg from '../../../package.json'
 
 const DONATIONS = [
-  { chain: 'Ethereum', address: '0x0000000000000000000000000000000000000000' },
-  { chain: 'Solana',   address: 'So11111111111111111111111111111111111111112' },
+  { chain: 'Ethereum', address: '0x666491a68506564C97a17E697B0f96F52657a760' },
+  { chain: 'Bitcoin',   address: 'bc1qfnvnnwcktmrwehv9gtrm5c7l5sqzyvgpapvurc' },
 ]
 
 export default function Info() {

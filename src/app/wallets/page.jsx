@@ -20,7 +20,7 @@ const CHAINS = [
 const empty = () => ({ address: '', chains: ['eth'] })
 
 export default function Wallets() {
-  const { apiKey, wallets, setWallets } = useConfig()
+  const { apiKey, unisatKey, wallets, setWallets } = useConfig()
   const [scanning, setScanning] = useState(false)
   const [logs,     setLogs]     = useState([])
   const [rawCount, setRawCount] = useState(null)
@@ -50,7 +50,7 @@ export default function Wallets() {
       setLogs(prev => [...prev, payload.message])
     })
     await window.electron.raw.clear()
-    await window.electron.runAlchemy(apiKey.trim(), valid.map(w => ({ address: w.address.trim(), chains: w.chains })))
+    await window.electron.runAlchemy(apiKey.trim(), unisatKey.trim(), valid.map(w => ({ address: w.address.trim(), chains: w.chains })))
   }
 
   function setAddress(i, address) {

@@ -7,15 +7,21 @@ const ConfigContext = createContext(null)
 const DEFAULT_WALLETS = [{ address: '', chains: ['eth'] }]
 
 export function ConfigProvider({ children }) {
-  const [apiKey,  setApiKey]  = useState('')
-  const [wallets, setWallets] = useState(DEFAULT_WALLETS)
-  const [ready,   setReady]   = useState(false)
+  const [apiKey,    setApiKey]    = useState('')
+  const [unisatKey, setUnisatKey] = useState('')
+  const [wallets,   setWallets]   = useState(DEFAULT_WALLETS)
+  const [ready,     setReady]     = useState(false)
 
   // Load from localStorage after mount — avoids SSR/client hydration mismatch
   useEffect(() => {
     try {
       const key = localStorage.getItem('cfg:apiKey')
       if (key !== null) setApiKey(JSON.parse(key))
+    } catch {}
+
+    try {
+      const key = localStorage.getItem('cfg:unisatKey')
+      if (key !== null) setUnisatKey(JSON.parse(key))
     } catch {}
 
     try {
@@ -33,11 +39,12 @@ export function ConfigProvider({ children }) {
   }, [])
 
   // Only persist after the initial load, so we don't overwrite stored data with defaults
-  useEffect(() => { if (ready) localStorage.setItem('cfg:apiKey',  JSON.stringify(apiKey))  }, [apiKey,  ready])
-  useEffect(() => { if (ready) localStorage.setItem('cfg:wallets', JSON.stringify(wallets)) }, [wallets, ready])
+  useEffect(() => { if (ready) localStorage.setItem('cfg:apiKey',    JSON.stringify(apiKey))    }, [apiKey,    ready])
+  useEffect(() => { if (ready) localStorage.setItem('cfg:unisatKey', JSON.stringify(unisatKey)) }, [unisatKey, ready])
+  useEffect(() => { if (ready) localStorage.setItem('cfg:wallets',   JSON.stringify(wallets))   }, [wallets,   ready])
 
   return (
-    <ConfigContext.Provider value={{ apiKey, setApiKey, wallets, setWallets }}>
+    <ConfigContext.Provider value={{ apiKey, setApiKey, unisatKey, setUnisatKey, wallets, setWallets }}>
       {children}
     </ConfigContext.Provider>
   )

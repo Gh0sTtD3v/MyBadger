@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('electron', {
   removeListeners: ()   => ipcRenderer.removeAllListeners('script-event'),
 
   // Alchemy scan
-  runAlchemy:  (apiKey, wallets)          => invoke('run-alchemy',  { apiKey, wallets }),
+  runAlchemy:  (apiKey, unisatKey, wallets) => invoke('run-alchemy',  { apiKey, unisatKey, wallets }),
   runContract: (apiKey, contracts)        => invoke('run-contract', { apiKey, contracts }),
 
   // Raw NFTs
@@ -62,6 +62,11 @@ contextBridge.exposeInMainWorld('electron', {
     pin:    (curationId, nftId, localPath)  => invoke('ipfs:pin', { curationId, nftId, localPath }),
     pinUrl: (nftId, url)                    => invoke('ipfs:pinUrl', { nftId, url }),
     unpin:  (nftId, cid)                    => invoke('ipfs:unpin', { nftId, cid }),
+  },
+
+  // Pins (persisted across re-scans)
+  pins: {
+    list: () => invoke('pins:list'),
   },
 
   // Settings

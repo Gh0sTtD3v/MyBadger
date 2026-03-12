@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 
 const PAGE_SIZE = 80
@@ -8,17 +8,20 @@ const PAGE_SIZE = 80
 export default function Gallery() {
   const { id: curationId } = useParams()
 
-  const [curation, setCuration] = useState(null)
-  const [stats,    setStats]    = useState(null)
-  const [chains,   setChains]   = useState([])
-  const [filter,   setFilterState] = useState({ chain: null, search: '' })
-  const [result,   setResult]   = useState({ rows: [], total: 0 })
-  const [loading,  setLoading]  = useState(true)
-  const [page,     setPage]     = useState(0)
-  const [selected, setSelected] = useState(null)
-  const [wpStatus,     setWpStatus]     = useState(null)
-  const [jsonStatus,   setJsonStatus]   = useState(null)
-  const [folderStatus, setFolderStatus] = useState(null)
+  const [curation,     setCuration]    = useState(null)
+  const [stats,        setStats]       = useState(null)
+  const [chains,       setChains]      = useState([])
+  const [filter,       setFilterState] = useState({ chain: null, search: '' })
+  const [rows,         setRows]        = useState([])
+  const [total,        setTotal]       = useState(0)
+  const [page,         setPage]        = useState(0)
+  const [loading,      setLoading]     = useState(false)
+  const [hasMore,      setHasMore]     = useState(false)
+  const [selected,     setSelected]    = useState(null)
+  const [wpStatus,     setWpStatus]    = useState(null)
+  const [jsonStatus,   setJsonStatus]  = useState(null)
+  const [folderStatus, setFolderStatus]= useState(null)
+  const sentinelRef = useRef(null)
 
   function setFilter(patch) {
     setFilterState(prev => ({ ...prev, ...patch }))
@@ -29,6 +32,8 @@ export default function Gallery() {
     if (!curationId || !window.electron) return
     setStats(null); setChains([]); setCuration(null)
     setWpStatus(null); setJsonStatus(null); setFolderStatus(null)
+    setRows([]); setTotal(0); setPage(0); setHasMore(false)
+    setFilterState({ chain: null, search: '' })
     Promise.all([
       window.electron.curations.get(curationId),
       window.electron.curated.stats(curationId),
@@ -65,14 +70,32 @@ export default function Gallery() {
 
   useEffect(() => {
     if (!curationId || !window.electron) return
+    let cancelled = false
     setLoading(true)
     window.electron.curated.nfts(curationId, {
       chain:  filter.chain  || undefined,
       search: filter.search || undefined,
       limit:  PAGE_SIZE,
       offset: page * PAGE_SIZE,
-    }).then(res => { setResult(res); setLoading(false) })
+    }).then(res => {
+      if (cancelled) return
+      setRows(prev => page === 0 ? res.rows : [...prev, ...res.rows])
+      setTotal(res.total)
+      setHasMore(page * PAGE_SIZE + res.rows.length < res.total)
+      setLoading(false)
+    })
+    return () => { cancelled = true }
   }, [curationId, filter, page])
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !loading && hasMore) setPage(p => p + 1)
+    }, { rootMargin: '300px' })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [loading, hasMore])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '24px', gap: '14px', boxSizing: 'border-box', overflow: 'hidden' }}>
@@ -116,8 +139,14 @@ export default function Gallery() {
       <FilterRow chains={chains} filter={filter} setFilter={setFilter} />
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        <NftGrid rows={result.rows} loading={loading} onSelect={setSelected} />
-        <Pagination page={page} total={result.total} pageSize={PAGE_SIZE} setPage={setPage} />
+        <NftGrid rows={rows} loading={loading && page === 0} onSelect={setSelected} />
+        <div ref={sentinelRef} style={{ height: '1px' }} />
+        {loading && page > 0 && (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-4)', fontSize: '13px' }}>Loading…</div>
+        )}
+        {!hasMore && rows.length > 0 && total > PAGE_SIZE && (
+          <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--text-4)', fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>{total} items</div>
+        )}
       </div>
 
       {selected && <DetailModal nft={selected} onClose={() => setSelected(null)} />}
@@ -210,6 +239,104 @@ const SOURCE_COLORS = {
   http:    null,
 }
 
+const CHAIN_META = {
+  eth:      { color: '#627EEA' },
+  polygon:  { color: '#8247E5' },
+  arb:      { color: '#28A0F0' },
+  opt:      { color: '#FF0420' },
+  base:     { color: '#0052FF' },
+  zora:     { color: '#A36EFD' },
+  btc:      { color: '#F7931A' },
+  xcp:      { color: '#F7931A' },
+  solana:   { color: '#9945FF' },
+  tezos:    { color: '#2C7DF7' },
+  xrpl:     { color: '#00AAE4' },
+}
+
+function ChainSvg({ chain, color }) {
+  const p = { width: 13, height: 13, viewBox: '0 0 16 16', fill: 'none', style: { flexShrink: 0, display: 'block' } }
+  switch (chain) {
+    case 'eth':
+      return <svg {...p}>
+        <path d="M8 1.5L14 8.5L8 10.5L2 8.5Z" fill={color} fillOpacity="0.9"/>
+        <path d="M8 10.5L14 8.5L8 14.5L2 8.5Z" fill={color} fillOpacity="0.5"/>
+      </svg>
+    case 'polygon':
+      return <svg {...p}>
+        <path d="M10.5 5.5L8 4L5.5 5.5V8.5L8 10L10.5 8.5V5.5Z" stroke={color} strokeWidth="1.3" fill={color} fillOpacity="0.18" strokeLinejoin="round"/>
+        <path d="M10.5 5.5L13 4V9L10.5 10.5" stroke={color} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M5.5 5.5L3 4V9L5.5 10.5" stroke={color} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    case 'btc':
+    case 'xcp':
+      return <svg {...p}>
+        <path d="M5.5 3H9.5C10.6 3 11.5 3.9 11.5 5S10.6 7 9.5 7H5.5" stroke={color} strokeWidth="1.4" strokeLinecap="round"/>
+        <path d="M5.5 7H10C11.1 7 12 7.9 12 9S11.1 11 10 11H5.5" stroke={color} strokeWidth="1.4" strokeLinecap="round"/>
+        <path d="M5.5 3V11" stroke={color} strokeWidth="1.4" strokeLinecap="round"/>
+        <path d="M7.5 1.5V3M7.5 11V12.5" stroke={color} strokeWidth="1.3" strokeLinecap="round"/>
+      </svg>
+    case 'solana':
+      return <svg {...p}>
+        <path d="M3 5H11L13 3H5Z" fill={color}/>
+        <path d="M3 8.5H11L13 6.5H5Z" fill={color}/>
+        <path d="M3 12H11L13 10H5Z" fill={color}/>
+      </svg>
+    case 'tezos':
+      return <svg {...p}>
+        <path d="M4 4H12M8 4V12" stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M5.5 8H10.5" stroke={color} strokeWidth="1.3" strokeLinecap="round"/>
+      </svg>
+    case 'xrpl':
+      return <svg {...p}>
+        <path d="M3 3L7 8L3 13M13 3L9 8L13 13" stroke={color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    case 'arb':
+      return <svg {...p}>
+        <path d="M8 2L14 13H2L8 2Z" stroke={color} strokeWidth="1.4" fill={color} fillOpacity="0.12" strokeLinejoin="round"/>
+        <path d="M6.5 9.5L8 7L9.5 9.5" stroke={color} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    case 'opt':
+      return <svg {...p}>
+        <circle cx="8" cy="8" r="5.5" stroke={color} strokeWidth="1.4"/>
+        <circle cx="8" cy="8" r="2.5" fill={color} fillOpacity="0.75"/>
+      </svg>
+    case 'base':
+      return <svg {...p}>
+        <circle cx="8" cy="8" r="5.5" stroke={color} strokeWidth="1.4"/>
+        <path d="M6 5.5H9C10.1 5.5 11 6.4 11 7.5V8.5C11 9.6 10.1 10.5 9 10.5H6V5.5Z" fill={color} fillOpacity="0.8"/>
+      </svg>
+    case 'zora':
+      return <svg {...p}>
+        <circle cx="8" cy="8" r="5.5" stroke={color} strokeWidth="1.4"/>
+        <circle cx="8" cy="8" r="2" stroke={color} strokeWidth="1.2"/>
+      </svg>
+    default:
+      return <svg {...p}><circle cx="8" cy="8" r="5.5" stroke="var(--text-4)" strokeWidth="1.3" strokeDasharray="2 2"/></svg>
+  }
+}
+
+function ChainIcon({ chain }) {
+  const key   = chain?.toLowerCase()
+  const color = CHAIN_META[key]?.color || 'var(--text-4)'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+      <ChainSvg chain={key} color={color} />
+      <span style={{ fontFamily: 'var(--font-display)', fontSize: '9px', fontWeight: 600, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{chain}</span>
+    </div>
+  )
+}
+
+function VideoIcon() {
+  return (
+    <div title="Video" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 18, color: 'var(--blue)', flexShrink: 0 }}>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+        <rect x="1.5" y="4" width="9" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+        <path d="M10.5 6.5L14.5 4.5V11.5L10.5 9.5V6.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+      </svg>
+    </div>
+  )
+}
+
 function NftCard({ nft, onSelect }) {
   const thumbSrc   = nft.thumbPath ? mediaUrl(nft.thumbPath) : null
   const isVideo    = nft.mediaType === 'video'
@@ -261,9 +388,9 @@ function NftCard({ nft, onSelect }) {
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '13px', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
         <div style={{ fontSize: '11px', color: 'var(--text-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{collection}</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '5px' }}>
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: '9px', fontWeight: 600, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{nft.chain}</span>
-          <div style={{ display: 'flex', gap: '3px' }}>
-            {isVideo && <span className="badge badge-blue">video</span>}
+          <ChainIcon chain={nft.chain} />
+          <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+            {isVideo && <VideoIcon />}
             {sc && <span className="badge" style={{ color: sc.color, background: sc.bg, border: `1px solid ${sc.bdr}` }}>{source}</span>}
             {nft.cid && <span className="badge badge-green">pinned</span>}
           </div>
@@ -353,14 +480,3 @@ function DetailModal({ nft, onClose }) {
   )
 }
 
-function Pagination({ page, total, pageSize, setPage }) {
-  const totalPages = Math.ceil(total / pageSize)
-  if (totalPages <= 1) return null
-  return (
-    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center', padding: '16px 0', fontSize: '13px', color: 'var(--text-3)' }}>
-      <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="btn btn-ghost" style={{ padding: '4px 14px', fontSize: '13px' }}>prev</button>
-      <span style={{ fontVariantNumeric: 'tabular-nums' }}>{page + 1} / {totalPages}</span>
-      <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="btn btn-ghost" style={{ padding: '4px 14px', fontSize: '13px' }}>next</button>
-    </div>
-  )
-}

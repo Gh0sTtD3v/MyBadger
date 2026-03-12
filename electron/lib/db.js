@@ -2,7 +2,7 @@ const Datastore = require('@seald-io/nedb')
 const path = require('path')
 const fs = require('fs')
 
-let nfts, curations, curatedNfts
+let nfts, curations, curatedNfts, pins
 let MEDIA_DIR
 let settingsPath
 
@@ -32,6 +32,9 @@ function initDb(dataDir) {
   curatedNfts.ensureIndex({ fieldName: 'curationId' })
   curatedNfts.ensureIndex({ fieldName: 'chain' })
   curatedNfts.ensureIndex({ fieldName: 'collection' })
+
+  pins = new Datastore({ filename: path.join(dataDir, 'pins.db'), autoload: true })
+  pins.ensureIndex({ fieldName: 'nftId', unique: true })
 }
 
 function getMediaDir() { return MEDIA_DIR }
@@ -49,6 +52,9 @@ function setMediaDir(newPath) {
 async function upsertNFTs(rows) {
   for (const row of rows) {
     await nfts.updateAsync({ id: row.id }, { $set: row }, { upsert: true })
+    // Restore pin data if this NFT was previously pinned
+    const pin = await pins.findOneAsync({ nftId: row.id })
+    if (pin) await nfts.updateAsync({ id: row.id }, { $set: { cid: pin.cid, localPath: pin.localPath } })
   }
 }
 
@@ -66,7 +72,7 @@ async function queryRawNfts({ search, chain, wallet, limit = 50, offset = 0 } = 
   if (chain)  query.chain  = chain
   if (wallet) query.wallet = wallet
   if (search) query.$or = [{ name: new RegExp(search, 'i') }, { 'contract.name': new RegExp(search, 'i') }, { 'collection.name': new RegExp(search, 'i') }]
-  const rows  = await nfts.findAsync(query, { id: 1, name: 1, chain: 1, wallet: 1, tokenId: 1, contract: 1, collection: 1, image: 1, animation: 1, cid: 1 }).skip(offset).limit(limit)
+  const rows  = await nfts.findAsync(query, { id: 1, name: 1, chain: 1, wallet: 1, tokenId: 1, contract: 1, collection: 1, image: 1, animation: 1, cid: 1, localPath: 1 }).skip(offset).limit(limit)
   const total = await nfts.countAsync(query)
   return { rows, total }
 }
@@ -82,6 +88,20 @@ async function getRawNftById(id) {
 
 async function getRawNftCount() {
   return nfts.countAsync({})
+}
+
+// ── Pins ──────────────────────────────────────────────────
+
+async function upsertPin(nftId, fields) {
+  await pins.updateAsync({ nftId }, { $set: { nftId, ...fields, pinnedAt: Date.now() } }, { upsert: true })
+}
+
+async function removePin(nftId) {
+  await pins.removeAsync({ nftId })
+}
+
+async function listPins() {
+  return pins.findAsync({}).sort({ pinnedAt: -1 })
 }
 
 // ── Curations ─────────────────────────────────────────────
@@ -155,6 +175,7 @@ async function getCurationStats(curationId) {
 module.exports = {
   initDb, getMediaDir, setMediaDir,
   upsertNFTs, patchRawNft, clearRawNfts, queryRawNfts, getDistinctRawValues, getRawNftById, getRawNftCount,
+  upsertPin, removePin, listPins,
   createCuration, listCurations, getCurationById, deleteCuration,
   upsertCuratedNft, patchCuratedNft, removeCuratedNfts, getCuratedNftIds, getCuratedNfts, getDistinctCuratedValues, getCurationStats,
 }

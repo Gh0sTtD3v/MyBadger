@@ -61,9 +61,11 @@ ipcMain.handle('llm:download', async (event) => {
 })
 
 ipcMain.handle('ipfs:status', () => ipfs.getStatus())
+ipcMain.handle('pins:list',   () => db.listPins())
 ipcMain.handle('ipfs:unpin', async (_e, { nftId, cid }) => {
   try { await ipfs.unpinCid(cid) } catch (err) { return { error: err.message } }
   await db.patchRawNft(nftId, { cid: null })
+  await db.removePin(nftId)
   return { ok: true }
 })
 ipcMain.handle('ipfs:pin', async (_e, { curationId, nftId, localPath }) => {
@@ -73,6 +75,8 @@ ipcMain.handle('ipfs:pin', async (_e, { curationId, nftId, localPath }) => {
   return { cid }
 })
 ipcMain.handle('ipfs:pinUrl', async (_e, { nftId, url }) => {
+  const existing = await db.listPins().then(p => p.find(x => x.nftId === nftId))
+  if (existing?.cid) return { cid: existing.cid, cached: true }
   const axios = require('axios')
   const mediaBase = db.getMediaDir()
   const dir = path.join(mediaBase, nftId)
@@ -123,54 +127,65 @@ ipcMain.handle('ipfs:pinUrl', async (_e, { nftId, url }) => {
 
   const localPath = path.join(nftId, path.basename(localFile))
   await db.patchRawNft(nftId, { cid, localPath })
-  return { cid }
+  const nft = await db.getRawNftById(nftId)
+  await db.upsertPin(nftId, {
+    cid, localPath,
+    name:   nft?.name || nftId,
+    chain:  nft?.chain || null,
+    wallet: nft?.wallet || null,
+    url:    url,
+  })
+  return { cid, localPath }
 })
 
 function send(event, payload) { event.sender.send('script-event', payload) }
 
 // ── Alchemy ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 // wallets = [{ address, chains }]
-ipcMain.handle('run-alchemy', async (event, { apiKey, wallets }) => {
-  try {
-    const alchemyWallets = wallets.filter(w => Array.isArray(w.chains) && w.chains.some(c => c in ALL_CHAINS))
-    const tezosAddresses = wallets.filter(w => w.chains.includes('tezos')).map(w => w.address)
-    const solanaAddresses = wallets.filter(w => w.chains.includes('solana')).map(w => w.address)
-    const btcAddresses    = wallets.filter(w => w.chains.includes('btc')).map(w => w.address)
-    const xcpAddresses   = wallets.filter(w => w.chains.includes('xcp')).map(w => w.address)
-    const xrplAddresses  = wallets.filter(w => w.chains.includes('xrpl')).map(w => w.address)
-    let total = 0
+ipcMain.handle('run-alchemy', async (event, { apiKey, unisatKey, wallets }) => {
+  const alchemyWallets  = wallets.filter(w => Array.isArray(w.chains) && w.chains.some(c => c in ALL_CHAINS))
+  const tezosAddresses  = wallets.filter(w => w.chains.includes('tezos')).map(w => w.address)
+  const solanaAddresses = wallets.filter(w => w.chains.includes('solana')).map(w => w.address)
+  const btcAddresses    = wallets.filter(w => w.chains.includes('btc')).map(w => w.address)
+  const xcpAddresses    = wallets.filter(w => w.chains.includes('xcp')).map(w => w.address)
+  const xrplAddresses   = wallets.filter(w => w.chains.includes('xrpl')).map(w => w.address)
+  let total = 0
 
-    if (alchemyWallets.length) {
+  async function run(label, fn) {
+    try { await fn() }
+    catch (err) { send(event, { type: 'progress', message: `⚠ ${label} error: ${err.message}` }) }
+  }
+
+  if (alchemyWallets.length) {
+    await run('Alchemy', async () => {
       await runAlchemy(apiKey, alchemyWallets, (p) => {
         if (p.type === 'done') total += p.total || 0
         else send(event, p)
       })
-    }
-
-    if (tezosAddresses.length) {
-      total += await runTezos(tezosAddresses, (p) => send(event, p))
-    }
-
-    if (solanaAddresses.length) {
-      total += await runSolana(solanaAddresses, (p) => send(event, p))
-    }
-
-    if (btcAddresses.length) {
-      total += await runBtc(btcAddresses, (p) => send(event, p))
-    }
-
-    if (xcpAddresses.length) {
-      total += await runXcp(xcpAddresses, (p) => send(event, p))
-    }
-
-    if (xrplAddresses.length) {
-      total += await runXrpl(xrplAddresses, (p) => send(event, p))
-    }
-
-    send(event, { type: 'done', message: `Indexed ${total} NFTs`, total })
-  } catch (err) {
-    send(event, { type: 'error', message: err.message })
+    })
   }
+
+  if (tezosAddresses.length) {
+    await run('Tezos', async () => { total += await runTezos(tezosAddresses, (p) => send(event, p)) })
+  }
+
+  if (solanaAddresses.length) {
+    await run('Solana', async () => { total += await runSolana(solanaAddresses, (p) => send(event, p)) })
+  }
+
+  if (btcAddresses.length) {
+    await run('BTC', async () => { total += await runBtc(btcAddresses, (p) => send(event, p), unisatKey) })
+  }
+
+  if (xcpAddresses.length) {
+    await run('XCP', async () => { total += await runXcp(xcpAddresses, (p) => send(event, p)) })
+  }
+
+  if (xrplAddresses.length) {
+    await run('XRPL', async () => { total += await runXrpl(xrplAddresses, (p) => send(event, p)) })
+  }
+
+  send(event, { type: 'done', message: `Indexed ${total} NFTs`, total })
 })
 
 ipcMain.handle('run-contract', async (event, { apiKey, contracts }) => {

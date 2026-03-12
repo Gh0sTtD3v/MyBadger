@@ -1,26 +1,38 @@
 const axios = require('axios')
 const { upsertNFTs } = require('./db')
 
-const HIRO  = 'https://api.hiro.so/ordinals/v1'
-const LIMIT = 60
+const BASE = 'https://open-api.unisat.io'
 
-async function fetchBtcWallet(address) {
+
+async function fetchBtcWallet(address, token) {
   const inscriptions = []
-  let offset = 0
+  let cursor = 0
+  const size = 100
 
   while (true) {
-    const res = await axios.get(`${HIRO}/inscriptions`, {
-      params: { address, limit: LIMIT, offset },
-    })
-    inscriptions.push(...res.data.results)
-    if (inscriptions.length >= res.data.total) break
-    offset += LIMIT
+    const url = `${BASE}/v1/indexer/address/${address}/inscription-utxo-data`
+    let res
+    try {
+      res = await axios.get(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { cursor, size },
+      })
+    } catch (err) {
+      const status = err.response?.status
+      const body   = JSON.stringify(err.response?.data)
+      throw new Error(`UniSat GET ${url} → ${status}: ${body}`)
+    }
+    if (res.data.code !== 0) throw new Error(`UniSat error (code ${res.data.code}): ${res.data.msg}`)
+    const { list = [], total } = res.data.data
+    inscriptions.push(...list)
+    if (inscriptions.length >= total) break
+    cursor += size
   }
 
   return inscriptions
 }
 
-async function runBtc(wallets, send) {
+async function runBtc(wallets, send, apiKey) {
   let totalIndexed = 0
 
   for (const wallet of wallets) {
@@ -28,22 +40,22 @@ async function runBtc(wallets, send) {
 
     send({ type: 'log', message: `Scanning BTC wallet ${wallet}...` })
 
-    const inscriptions = await fetchBtcWallet(wallet)
+    const inscriptions = await fetchBtcWallet(wallet, apiKey)
 
     const rows = inscriptions.map(ins => {
-      const contentUrl = `${HIRO}/inscriptions/${ins.id}/content`
-      const isImage    = ins.mime_type?.startsWith('image/')
-      const isVideo    = ins.mime_type?.startsWith('video/')
-      const isHtml     = ins.mime_type?.includes('html')
+      const isImage = ins.contentType?.startsWith('image/')
+      const isVideo = ins.contentType?.startsWith('video/')
+      const isHtml  = ins.contentType?.includes('html')
+      const contentUrl = ins.contentUrl || null
 
       return {
-        id:          `btc_${ins.id}`,
+        id:          `btc_${ins.inscriptionId}`,
         wallet,
         chain:       'btc',
-        name:        `Inscription #${ins.number}`,
+        name:        ins.name || `Inscription #${ins.inscriptionNumber}`,
         description: null,
-        tokenId:     String(ins.number),
-        contract:    { address: ins.genesis_tx_id, name: 'Ordinals' },
+        tokenId:     String(ins.inscriptionNumber),
+        contract:    { address: ins.inscriptionId, name: 'Ordinals' },
         collection:  { name: 'Bitcoin Ordinals' },
         image:       {
           originalUrl:  isImage ? contentUrl : null,

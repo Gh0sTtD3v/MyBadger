@@ -67,8 +67,29 @@ export default function NavBar() {
         }}>Menu</span>
       </button>
 
+      {/* Curations header */}
+      <div style={{
+        padding: '10px 14px 4px 18px',
+        marginBottom: '4px',
+        opacity: open ? 1 : 0,
+        maxHeight: open ? '28px' : '0px',
+        overflow: 'hidden',
+        transition: `max-height var(--slide), opacity var(--ease)`,
+        pointerEvents: 'none',
+      }}>
+        <span style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: '11px',
+          fontWeight: 700,
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          color: 'var(--text-4)',
+          whiteSpace: 'nowrap',
+        }}>Curations</span>
+      </div>
+
       {/* Curations list */}
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingTop: '2px', overflowY: 'auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingTop: '2px', overflowY: 'auto', marginLeft: '24px' }}>
         {curations.length === 0 && (
           <span style={{
             padding: '5px 14px 5px 34px',
@@ -99,13 +120,12 @@ export default function NavBar() {
 
       {/* Bottom icon links */}
       <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: '10px', paddingTop: '4px' }}>
-        <NavIconLink href="/indexer"   label="Curate"    active={pathname === '/indexer'}   open={open} onClick={() => setOpen(true)}><IndexerIcon /></NavIconLink>
-        <NavIconLink href="/ipfs"      label="IPFS"      active={pathname === '/ipfs'}      open={open} onClick={() => setOpen(true)}><IpfsIcon /></NavIconLink>
-        <NavIconLink href="/wallets"   label="Wallets"   active={pathname === '/wallets'}   open={open} onClick={() => setOpen(true)}><WalletIcon /></NavIconLink>
-        <NavIconLink href="/contracts" label="Contracts" active={pathname === '/contracts'} open={open} onClick={() => setOpen(true)}><ContractIcon /></NavIconLink>
-        <NavIconLink href="/config"    label="Config"    active={pathname === '/config'}    open={open} onClick={() => setOpen(true)}><AlchemyIcon /></NavIconLink>
-        <NavIconLink href="/info"      label="Info"      active={pathname === '/info'}      open={open} onClick={() => setOpen(true)}><InfoIcon /></NavIconLink>
-        <NavIconLink href="/dev"       label="Dev"       active={pathname === '/dev'}       open={open} onClick={() => setOpen(true)}><DevIcon /></NavIconLink>
+        <NavIconLink href="/indexer" label="Curate"  active={pathname === '/indexer'} open={open} onClick={() => setOpen(true)}><IndexerIcon /></NavIconLink>
+        <NavIconLink href="/ipfs"    label="IPFS"    active={pathname === '/ipfs'}    open={open} onClick={() => setOpen(true)}><IpfsIcon /></NavIconLink>
+        <NavIconLink href="/scan" label="Scan" active={pathname === '/scan'} open={open} onClick={() => setOpen(true)}><SourcesIcon /></NavIconLink>
+        <NavIconLink href="/config"  label="Config"  active={pathname === '/config'}  open={open} onClick={() => setOpen(true)}><AlchemyIcon /></NavIconLink>
+        <NavIconLink href="/info"    label="Info"    active={pathname === '/info'}    open={open} onClick={() => setOpen(true)}><InfoIcon /></NavIconLink>
+        <NavIconLink href="/dev"     label="Dev"     active={pathname === '/dev'}     open={open} onClick={() => setOpen(true)}><DevIcon /></NavIconLink>
       </div>
 
     </nav>
@@ -116,7 +136,8 @@ function SubLink({ href, label, active, open, onClick }) {
   return (
     <Link href={href} style={{
       display: 'block',
-      padding: '5px 14px 5px 34px',
+      padding: '5px 14px 5px 18px',
+      marginLeft: '10px',
       color: active ? 'var(--accent)' : 'var(--text-3)',
       textDecoration: 'none',
       fontSize: '13px',
@@ -129,7 +150,7 @@ function SubLink({ href, label, active, open, onClick }) {
       pointerEvents: open ? 'auto' : 'none',
       letterSpacing: '0.01em',
       background: active ? 'var(--accent-xlo)' : 'transparent',
-      borderLeft: `2px solid ${active ? 'var(--accent)' : 'transparent'}`,
+      borderLeft: `2px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
       marginLeft: '1px',
     }} onClick={onClick}>
       {label}
@@ -241,6 +262,16 @@ function IpfsIcon() {
       <path d="M9 3 L14.2 6 L9 9 L3.8 6 Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
       <path d="M3.8 6 L9 9 L9 15 L3.8 12 Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
       <path d="M9 9 L14.2 6 L14.2 12 L9 15 Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function SourcesIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
+      <rect x="2" y="3" width="14" height="3" rx="1" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="2" y="8" width="14" height="3" rx="1" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="2" y="13" width="8" height="3" rx="1" stroke="currentColor" strokeWidth="1.3" />
     </svg>
   )
 }

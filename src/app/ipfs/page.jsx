@@ -15,13 +15,14 @@ const SOURCE_COLORS = {
   http:    { color: 'var(--text-3)',  bg: 'var(--bg-2)'     },
 }
 
-const FILTERS  = ['all', 'ipfs', 'arweave', 'http', 'pinned', 'unpinned']
-const PAGE_SIZE = 200
+const FILTERS    = ['all', 'ipfs', 'arweave', 'http', 'pinned', 'unpinned']
+const PAGE_SIZES = [20, 50, 100, 200, 500]
 
 export default function IpfsPage() {
   const [nfts,         setNfts]         = useState([])
   const [total,        setTotal]        = useState(0)
   const [page,         setPage]         = useState(0)
+  const [pageSize,     setPageSize]     = useState(200)
   const [chains,       setChains]       = useState([])
   const [wallets,      setWallets]      = useState([])
   const [chainFilter,  setChainFilter]  = useState('')
@@ -32,6 +33,7 @@ export default function IpfsPage() {
   const [selected,     setSelected]     = useState(new Set())
   const [pinning,      setPinning]      = useState(false)
   const [unpinning,    setUnpinning]    = useState(false)
+  const [progress,     setProgress]     = useState(null)
   const [logs,         setLogs]         = useState([])
 
   useEffect(() => {
@@ -47,10 +49,10 @@ export default function IpfsPage() {
       search: search || undefined,
       chain:  chainFilter  || undefined,
       wallet: walletFilter || undefined,
-      limit:  PAGE_SIZE,
-      offset: page * PAGE_SIZE,
+      limit:  pageSize,
+      offset: page * pageSize,
     }).then(res => { setNfts(res.rows); setTotal(res.total) })
-  }, [page, search, chainFilter, walletFilter])
+  }, [page, pageSize, search, chainFilter, walletFilter])
 
   const filtered = nfts.filter(n => {
     if (filter === 'all')      return true
@@ -75,18 +77,30 @@ export default function IpfsPage() {
   async function pinSelected() {
     if (!selected.size || !window.electron) return
     setPinning(true)
+    setProgress(null)
+    setLogs([])
     const toPin = filtered.filter(n => selected.has(n.id))
+    const total = toPin.length
 
-    for (const nft of toPin) {
+    for (let i = 0; i < toPin.length; i++) {
+      const nft = toPin[i]
+      setProgress({ current: i + 1, total })
       const url = nft.animation?.originalUrl || nft.image?.originalUrl
       if (!url) {
-        setLogs(prev => [...prev, `skip ${nft.name} — no URL`])
+        setLogs(prev => [...prev, `skip ${nft.name || nft.id} — no URL`])
+        continue
+      }
+      if (nft.localPath) {
+        setLogs(prev => [...prev, `skip ${nft.name || nft.id} — already downloaded`])
         continue
       }
       setLogs(prev => [...prev, `pinning ${nft.name || nft.id}...`])
       const res = await window.electron.ipfs.pinUrl(nft.id, url)
-      if (res?.cid) {
+      if (res?.cached) {
         setNfts(prev => prev.map(n => n.id === nft.id ? { ...n, cid: res.cid } : n))
+        setLogs(prev => [...prev, `  ✓ already pinned (${res.cid})`])
+      } else if (res?.cid) {
+        setNfts(prev => prev.map(n => n.id === nft.id ? { ...n, cid: res.cid, localPath: res.localPath } : n))
         setLogs(prev => [...prev, `  ✓ ${res.cid}`])
       } else {
         setLogs(prev => [...prev, `  ✗ ${res?.error || 'failed'}`])
@@ -95,6 +109,7 @@ export default function IpfsPage() {
 
     setSelected(new Set())
     setPinning(false)
+    setProgress(null)
   }
 
   async function unpinSelected() {
@@ -119,7 +134,7 @@ export default function IpfsPage() {
 
   const canPin     = !pinning && !unpinning && selected.size > 0 && ipfsStatus?.running
   const canUnpin   = !pinning && !unpinning && filtered.some(n => selected.has(n.id) && n.cid) && ipfsStatus?.running
-  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const totalPages = Math.ceil(total / pageSize)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '24px', gap: '16px', boxSizing: 'border-box', overflow: 'hidden' }}>
@@ -151,23 +166,26 @@ export default function IpfsPage() {
         ))}
       </div>
 
-      {/* Chain / wallet / search + actions */}
+      {/* Controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-        <select value={chainFilter} onChange={e => { setChainFilter(e.target.value); setPage(0) }} className="input" style={{ fontSize: '13px' }}>
-          <option value="">All chains</option>
-          {chains.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={walletFilter} onChange={e => { setWalletFilter(e.target.value); setPage(0) }} className="input" style={{ fontSize: '13px', maxWidth: '140px' }}>
-          <option value="">All wallets</option>
-          {wallets.map(w => <option key={w} value={w}>{w}</option>)}
-        </select>
         <input
           type="text" placeholder="Search…" value={search}
           onChange={e => { setSearch(e.target.value); setPage(0) }}
           className="input"
-          style={{ width: '140px', fontSize: '13px' }}
+          style={{ width: '150px', fontSize: '13px' }}
         />
-        <div style={{ flex: 1 }} />
+        <select value={chainFilter} onChange={e => { setChainFilter(e.target.value); setPage(0) }} className="input" style={{ fontSize: '13px' }}>
+          <option value="">All chains</option>
+          {chains.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={walletFilter} onChange={e => { setWalletFilter(e.target.value); setPage(0) }} className="input" style={{ fontSize: '13px', maxWidth: '150px' }}>
+          <option value="">All wallets</option>
+          {wallets.map(w => <option key={w} value={w}>{w}</option>)}
+        </select>
+        <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0) }} className="input" style={{ fontSize: '13px' }}>
+          {PAGE_SIZES.map(s => <option key={s} value={s}>{s} per page</option>)}
+        </select>
+        <span style={{ fontSize: '12px', color: 'var(--text-3)', marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>{total} NFTs</span>
         {selected.size > 0 && (
           <button onClick={() => setSelected(new Set())} className="btn btn-ghost">Deselect all</button>
         )}
@@ -186,6 +204,16 @@ export default function IpfsPage() {
           {pinning ? 'Pinning…' : `Pin${selected.size ? ` (${selected.size})` : ''}`}
         </button>
       </div>
+
+      {/* Progress bar */}
+      {progress && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>{progress.current} / {progress.total}</div>
+          <div style={{ height: '2px', background: 'var(--bg-3)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${(progress.current / progress.total) * 100}%`, background: 'var(--accent)', transition: 'width 0.15s ease' }} />
+          </div>
+        </div>
+      )}
 
       {/* List */}
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1px' }}>
@@ -227,6 +255,9 @@ export default function IpfsPage() {
               <span style={{ fontSize: '11px', color: sc.color, background: sc.bg, padding: '2px 8px', borderRadius: '20px', flexShrink: 0 }}>
                 {source}
               </span>
+              {nft.localPath && (
+                <span className="badge badge-blue" style={{ flexShrink: 0 }}>downloaded</span>
+              )}
               {nft.cid && (
                 <span className="badge badge-green" style={{ flexShrink: 0 }}>pinned</span>
               )}
@@ -237,7 +268,7 @@ export default function IpfsPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center', fontSize: '13px', color: 'var(--text-3)', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center', fontSize: '13px', color: 'var(--text-3)', paddingTop: '10px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
           <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="btn btn-ghost" style={{ padding: '4px 14px', fontSize: '13px' }}>prev</button>
           <span style={{ fontVariantNumeric: 'tabular-nums' }}>{page + 1} / {totalPages}</span>
           <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="btn btn-ghost" style={{ padding: '4px 14px', fontSize: '13px' }}>next</button>

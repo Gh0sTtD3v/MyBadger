@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useConfig } from '../../context/ConfigContext'
 
 export default function Config() {
-  const { apiKey, setApiKey } = useConfig()
+  const { apiKey, setApiKey, unisatKey, setUnisatKey } = useConfig()
   const [mediaDir,    setMediaDir]    = useState('')
   const [ipfsStatus,  setIpfsStatus]  = useState(null)
   const [llmStatus,   setLlmStatus]   = useState(null)
@@ -39,15 +39,26 @@ export default function Config() {
   }
 
   return (
-    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '460px' }}>
+    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '640px' }}>
       <h2 className="page-title">Config</h2>
 
-      <Field label="API Key">
+      <Field label="Alchemy API Key" guide={{ label: 'How to get an API key', href: 'https://www.alchemy.com/docs/create-an-api-key' }}>
         <input
           type="password"
           placeholder="Enter Alchemy API key"
           value={apiKey}
           onChange={e => setApiKey(e.target.value)}
+          className="input"
+          style={{ width: '100%' }}
+        />
+      </Field>
+
+      <Field label="UniSat API Key · Bitcoin Ordinals" guide={{ label: 'How to get an API key', href: 'https://docs.unisat.io/developer-support/how-to-acquire-a-unisat-api-key' }}>
+        <input
+          type="password"
+          placeholder="Enter UniSat API key"
+          value={unisatKey}
+          onChange={e => setUnisatKey(e.target.value)}
           className="input"
           style={{ width: '100%' }}
         />
@@ -115,10 +126,44 @@ export default function Config() {
   )
 }
 
-function Field({ label, children }) {
+function GuideLink({ href, label }) {
+  const [copied, setCopied] = useState(false)
+
+  function copy() {
+    navigator.clipboard.writeText(href)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <a href={href} target="_blank" rel="noreferrer" style={{ fontSize: '12px', color: 'var(--text-3)', textDecoration: 'none', borderBottom: '1px solid var(--border)' }}
+          onMouseEnter={e => e.target.style.color = 'var(--accent)'}
+          onMouseLeave={e => e.target.style.color = 'var(--text-3)'}
+        >{label} ↗</a>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span style={{ fontSize: '11px', color: 'var(--text-4)' }}>or visit:</span>
+        <button onClick={copy} style={{
+          background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+          fontSize: '11px', fontFamily: 'var(--font-mono)',
+          color: copied ? 'var(--accent)' : 'var(--text-3)',
+          transition: 'color var(--ease)',
+          wordBreak: 'break-all', textAlign: 'left',
+        }}>{copied ? 'copied!' : href}</button>
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, guide, children }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      <label className="section-label">{label}</label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <label className="section-label">{label}</label>
+        {guide && <GuideLink href={guide.href} label={guide.label} />}
+      </div>
       {children}
     </div>
   )

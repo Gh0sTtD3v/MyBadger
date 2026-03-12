@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useCurations } from '../../context/CurationsContext'
 
-const PAGE_SIZES = [20, 50, 100, 200]
+const PAGE_SIZES = [20, 50, 100, 200, 500]
 const VIDEO_EXTS = ['.mp4', '.webm', '.ogv', '.mov']
 
 function getMediaType(url) {
@@ -43,6 +43,21 @@ export default function Indexer() {
   const [progress, setProgress] = useState(null)
   const [logs,     setLogs]     = useState([])
   const logEndRef = useRef(null)
+
+  // Restore last-selected curation from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('activeCurationId')
+    if (saved && curations.length) {
+      const c = curations.find(c => c._id === saved)
+      if (c) setActiveCuration(c)
+    }
+  }, [curations])
+
+  // Persist selected curation
+  useEffect(() => {
+    if (activeCuration) localStorage.setItem('activeCurationId', activeCuration._id)
+    else localStorage.removeItem('activeCurationId')
+  }, [activeCuration])
 
   // Load distinct chain/wallet values for filters
   useEffect(() => {
@@ -163,6 +178,7 @@ export default function Indexer() {
             const c = curations.find(c => c._id === e.target.value) || null
             setActiveCuration(c)
           }}
+          disabled={running}
           className="input"
           style={{ fontSize: '13px' }}
         >
@@ -171,7 +187,7 @@ export default function Indexer() {
         </select>
 
         {!creating ? (
-          <button onClick={() => setCreating(true)} className="btn btn-ghost">+ New</button>
+          <button onClick={() => setCreating(true)} disabled={running} className="btn btn-ghost">+ New</button>
         ) : (
           <div style={{ display: 'flex', gap: '6px' }}>
             <input
@@ -189,7 +205,7 @@ export default function Indexer() {
         )}
 
         {activeCuration && (
-          <button onClick={deleteCuration} className="btn btn-danger">Delete</button>
+          <button onClick={deleteCuration} disabled={running} className="btn btn-danger">Delete</button>
         )}
 
         <div style={{ flex: 1 }} />
