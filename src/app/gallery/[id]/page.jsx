@@ -1,9 +1,15 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { useParams } from 'next/navigation'
 
 const PAGE_SIZE = 80
+const CARD_MIN_W = 175
+const CARD_GAP   = 12
+
+const AR = () => <div className='flex justify-center items-end align-middle w-4 h-4 font-bold text-black bg-white rounded-full'>a</div>
+const IPFS = () => <div className='flex justify-center items-end align-middle w-8 h-4  text-xs text-cyan-300 border-1 border-current rounded-lg'>ipfs</div>
 
 export default function Gallery() {
   const { id: curationId } = useParams()
@@ -21,7 +27,8 @@ export default function Gallery() {
   const [wpStatus,     setWpStatus]    = useState(null)
   const [jsonStatus,   setJsonStatus]  = useState(null)
   const [folderStatus, setFolderStatus]= useState(null)
-  const sentinelRef = useRef(null)
+  const scrollRef  = useRef(null)
+  const [colCount, setColCount] = useState(4)
 
   function setFilter(patch) {
     setFilterState(prev => ({ ...prev, ...patch }))
@@ -87,15 +94,35 @@ export default function Gallery() {
     return () => { cancelled = true }
   }, [curationId, filter, page])
 
+  // Measure container width → column count
   useEffect(() => {
-    const el = sentinelRef.current
+    const el = scrollRef.current
     if (!el) return
-    const obs = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && !loading && hasMore) setPage(p => p + 1)
-    }, { rootMargin: '300px' })
-    obs.observe(el)
-    return () => obs.disconnect()
-  }, [loading, hasMore])
+    const ro = new ResizeObserver(([entry]) => {
+      const w = entry.contentRect.width
+      setColCount(Math.max(1, Math.floor((w + CARD_GAP) / (CARD_MIN_W + CARD_GAP))))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const gridRows = []
+  for (let i = 0; i < rows.length; i += colCount) gridRows.push(rows.slice(i, i + colCount))
+
+  const virtualizer = useVirtualizer({
+    count: hasMore ? gridRows.length + 1 : gridRows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => CARD_MIN_W + CARD_GAP,
+    overscan: 3,
+  })
+
+  // Trigger next page when last virtual row is visible
+  useEffect(() => {
+    const items = virtualizer.getVirtualItems()
+    if (!items.length) return
+    const last = items[items.length - 1]
+    if (last.index >= gridRows.length - 1 && hasMore && !loading) setPage(p => p + 1)
+  }, [virtualizer.getVirtualItems(), hasMore, loading])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '24px', gap: '14px', boxSizing: 'border-box', overflow: 'hidden' }}>
@@ -138,12 +165,32 @@ export default function Gallery() {
       <StatsBar stats={stats} />
       <FilterRow chains={chains} filter={filter} setFilter={setFilter} />
 
-      <div style={{ flex: 1, overflowY: 'auto' }}>
-        <NftGrid rows={rows} loading={loading && page === 0} onSelect={setSelected} />
-        <div ref={sentinelRef} style={{ height: '1px' }} />
-        {loading && page > 0 && (
-          <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-4)', fontSize: '13px' }}>Loading…</div>
-        )}
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto' }}>
+        {loading && page === 0
+          ? <div style={{ color: 'var(--text-4)', fontSize: '14px', padding: '32px 0' }}>Loading…</div>
+          : !rows.length
+            ? <div style={{ color: 'var(--text-4)', fontSize: '14px', padding: '32px 0' }}>No NFTs found.</div>
+            : <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+                {virtualizer.getVirtualItems().map(virtualRow => {
+                  const isLoaderRow = virtualRow.index > gridRows.length - 1
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      data-index={virtualRow.index}
+                      ref={virtualizer.measureElement}
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualRow.start}px)` }}
+                    >
+                      {isLoaderRow
+                        ? <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-4)', fontSize: '13px' }}>Loading…</div>
+                        : <div style={{ display: 'grid', gridTemplateColumns: `repeat(${colCount}, 1fr)`, gap: `${CARD_GAP}px`, paddingBottom: `${CARD_GAP}px` }}>
+                            {gridRows[virtualRow.index].map(nft => <NftCard key={nft._id} nft={nft} onSelect={setSelected} />)}
+                          </div>
+                      }
+                    </div>
+                  )
+                })}
+              </div>
+        }
         {!hasMore && rows.length > 0 && total > PAGE_SIZE && (
           <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--text-4)', fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>{total} items</div>
         )}
@@ -249,7 +296,7 @@ const CHAIN_META = {
   btc:      { color: '#F7931A' },
   xcp:      { color: '#F7931A' },
   solana:   { color: '#9945FF' },
-  tezos:    { color: '#2C7DF7' },
+  tezos:    { color: '#f7d92c' },
   xrpl:     { color: '#00AAE4' },
 }
 
@@ -321,7 +368,7 @@ function ChainIcon({ chain }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
       <ChainSvg chain={key} color={color} />
-      <span style={{ fontFamily: 'var(--font-display)', fontSize: '9px', fontWeight: 600, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{chain}</span>
+      <span style={{ fontFamily: 'var(--font-display)', fontSize: '9px', fontWeight: 600, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{chain}</span>
     </div>
   )
 }
@@ -371,13 +418,13 @@ function NftCard({ nft, onSelect }) {
     >
       <div style={{ width: '100%', aspectRatio: '1/1', background: 'var(--bg-2)', overflow: 'hidden' }}>
         {thumbSrc ? (
-          <img src={thumbSrc} alt={name} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          <img src={thumbSrc} alt={name} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             onError={e => { e.target.style.display = 'none' }} />
         ) : isVideo && nft.localPath ? (
-          <video src={mediaUrl(nft.localPath)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted loop playsInline
+          <video src={mediaUrl(nft.localPath)} style={{ width: '100%', height: '100%', objectFit: 'contain' }} muted loop playsInline
             onMouseEnter={e => e.target.play()} onMouseLeave={e => { e.target.pause(); e.target.currentTime = 0 }} />
         ) : nft.imageUrl ? (
-          <img src={nft.imageUrl} alt={name} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          <img src={nft.imageUrl} alt={name} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             onError={e => { e.target.style.display = 'none' }} />
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-4)', fontSize: '11px', letterSpacing: '0.06em' }}>NO MEDIA</div>
@@ -389,9 +436,11 @@ function NftCard({ nft, onSelect }) {
         <div style={{ fontSize: '11px', color: 'var(--text-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{collection}</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '5px' }}>
           <ChainIcon chain={nft.chain} />
+          {/* {isVideo && <div>Video</div>} */}
           <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
             {isVideo && <VideoIcon />}
-            {sc && <span className="badge" style={{ color: sc.color, background: sc.bg, border: `1px solid ${sc.bdr}` }}>{source}</span>}
+            {/* {sc && <span className="badge" style={{ color: sc.color, background: sc.bg, border: `1px solid ${sc.bdr}` }}>{source}</span>} */}
+            {sc && source === 'ipfs' ? <IPFS /> : source === 'arweave' ? <AR /> : null}
             {nft.cid && <span className="badge badge-green">pinned</span>}
           </div>
         </div>

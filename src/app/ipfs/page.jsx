@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
+import { SmallViewIcon, LargeViewIcon, DetailViewIcon } from '../../components/ui/icons'
 
 function getSource(nft) {
   const url = nft.animation?.originalUrl || nft.image?.originalUrl || ''
@@ -23,10 +25,12 @@ export default function IpfsPage() {
   const [total,        setTotal]        = useState(0)
   const [page,         setPage]         = useState(0)
   const [pageSize,     setPageSize]     = useState(200)
-  const [chains,       setChains]       = useState([])
-  const [wallets,      setWallets]      = useState([])
-  const [chainFilter,  setChainFilter]  = useState('')
-  const [walletFilter, setWalletFilter] = useState('')
+  const [chains,          setChains]          = useState([])
+  const [wallets,         setWallets]         = useState([])
+  const [contracts,       setContracts]       = useState([])
+  const [chainFilter,     setChainFilter]     = useState('')
+  const [walletFilter,    setWalletFilter]    = useState('')
+  const [contractFilter,  setContractFilter]  = useState('')
   const [search,       setSearch]       = useState('')
   const [ipfsStatus,   setIpfsStatus]   = useState(null)
   const [filter,       setFilter]       = useState('all')
@@ -36,23 +40,27 @@ export default function IpfsPage() {
   const [progress,     setProgress]     = useState(null)
   const [logs,         setLogs]         = useState([])
 
+  const [view, setView] = useState('details')
+
   useEffect(() => {
     if (!window.electron) return
     window.electron.ipfs.status().then(setIpfsStatus)
     window.electron.raw.distinct('chain').then(setChains)
     window.electron.raw.distinct('wallet').then(setWallets)
+    window.electron.raw.distinct('contract.address').then(setContracts)
   }, [])
 
   useEffect(() => {
     if (!window.electron) return
     window.electron.raw.query({
       search: search || undefined,
-      chain:  chainFilter  || undefined,
-      wallet: walletFilter || undefined,
+      chain:    chainFilter    || undefined,
+      wallet:   walletFilter   || undefined,
+      contract: contractFilter || undefined,
       limit:  pageSize,
       offset: page * pageSize,
     }).then(res => { setNfts(res.rows); setTotal(res.total) })
-  }, [page, pageSize, search, chainFilter, walletFilter])
+  }, [page, pageSize, search, chainFilter, walletFilter, contractFilter])
 
   const filtered = nfts.filter(n => {
     if (filter === 'all')      return true
@@ -90,12 +98,14 @@ export default function IpfsPage() {
         setLogs(prev => [...prev, `skip ${nft.name || nft.id} — no URL`])
         continue
       }
-      if (nft.localPath) {
-        setLogs(prev => [...prev, `skip ${nft.name || nft.id} — already downloaded`])
+      if (nft.cid) {
+        setLogs(prev => [...prev, `skip ${nft.name || nft.id} — already pinned`])
         continue
       }
       setLogs(prev => [...prev, `pinning ${nft.name || nft.id}...`])
-      const res = await window.electron.ipfs.pinUrl(nft.id, url)
+      const res = nft.localPath
+        ? await window.electron.ipfs.pinRaw(nft.id, nft.localPath)
+        : await window.electron.ipfs.pinUrl(nft.id, url)
       if (res?.cached) {
         setNfts(prev => prev.map(n => n.id === nft.id ? { ...n, cid: res.cid } : n))
         setLogs(prev => [...prev, `  ✓ already pinned (${res.cid})`])
@@ -132,9 +142,27 @@ export default function IpfsPage() {
     setUnpinning(false)
   }
 
+  const [starting, setStarting] = useState(false)
+
+  async function startNode() {
+    if (!window.electron) return
+    setStarting(true)
+    const res = await window.electron.ipfs.start()
+    setIpfsStatus(res?.ok ? await window.electron.ipfs.status() : { running: false, error: res?.error })
+    setStarting(false)
+  }
+
+  const listRef = useRef(null)
   const canPin     = !pinning && !unpinning && selected.size > 0 && ipfsStatus?.running
   const canUnpin   = !pinning && !unpinning && filtered.some(n => selected.has(n.id) && n.cid) && ipfsStatus?.running
   const totalPages = Math.ceil(total / pageSize)
+
+  const virtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: () => 98,
+    overscan: 5,
+  })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '24px', gap: '16px', boxSizing: 'border-box', overflow: 'hidden' }}>
@@ -143,66 +171,108 @@ export default function IpfsPage() {
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <h2 className="page-title">IPFS</h2>
         <div style={{ flex: 1 }} />
+        {ipfsStatus && !ipfsStatus.running && (
+          <button onClick={startNode} disabled={starting} className="btn btn-ghost">
+            {starting ? 'Starting…' : 'Start node'}
+          </button>
+        )}
         {ipfsStatus && (
-          <span style={{ fontSize: '13px', color: ipfsStatus.running ? 'var(--accent)' : 'var(--red)', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontSize: '13px', color: ipfsStatus.running ? 'var(--accent)' : 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
             {ipfsStatus.running ? `● node running · ${ipfsStatus.peers} peers` : '● node offline'}
           </span>
         )}
       </div>
 
       {/* Source filter pills */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-        {FILTERS.map(f => (
-          <button key={f} onClick={() => setFilter(f)} style={{
-            padding: '3px 12px',
-            background: filter === f ? 'var(--accent-lo)' : 'transparent',
-            border: `1px solid ${filter === f ? 'var(--accent-bdr)' : 'var(--border)'}`,
-            borderRadius: '20px',
-            color: filter === f ? 'var(--accent)' : 'var(--text-3)',
-            fontSize: '12px', cursor: 'pointer',
-            fontFamily: 'var(--font-ui)',
-            transition: 'all var(--ease)',
-          }}>{f}</button>
-        ))}
+      <div className="w-full flex items-center justify-between gap-4">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          {FILTERS.map(f => (
+            <button key={f} onClick={() => setFilter(f)} style={{
+              padding: '3px 12px',
+              background: filter === f ? 'var(--accent-lo)' : 'transparent',
+              border: `1px solid ${filter === f ? 'var(--accent-bdr)' : 'var(--border)'}`,
+              borderRadius: '20px',
+              color: filter === f ? 'var(--accent)' : 'var(--text-3)',
+              fontSize: '12px', cursor: 'pointer',
+              fontFamily: 'var(--font-ui)',
+              transition: 'all var(--ease)',
+            }}>{f}</button>
+          ))}
+        </div>
+        <div className='flex items-center gap-4'>
+          
+          {selected.size > 0 && (
+            <button onClick={() => setSelected(new Set())} className="btn btn-ghost">Deselect all</button>
+          )}
+          <button onClick={selectAllIpfs} className="btn btn-ghost">Select IPFS</button>
+          {canUnpin && (
+            <button onClick={unpinSelected} disabled={!canUnpin} className="btn btn-danger">
+              {unpinning ? 'Unpinning…' : 'Unpin'}
+            </button>
+          )}
+          <button
+            onClick={pinSelected}
+            disabled={!canPin}
+            className="btn btn-primary"
+            style={{ opacity: canPin ? 1 : 0.35 }}
+          >
+            {pinning ? 'Pinning…' : `Pin${selected.size ? ` (${selected.size})` : ''}`}
+          </button>
+        </div>
       </div>
 
       {/* Controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-        <input
-          type="text" placeholder="Search…" value={search}
-          onChange={e => { setSearch(e.target.value); setPage(0) }}
-          className="input"
-          style={{ width: '150px', fontSize: '13px' }}
-        />
-        <select value={chainFilter} onChange={e => { setChainFilter(e.target.value); setPage(0) }} className="input" style={{ fontSize: '13px' }}>
-          <option value="">All chains</option>
-          {chains.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={walletFilter} onChange={e => { setWalletFilter(e.target.value); setPage(0) }} className="input" style={{ fontSize: '13px', maxWidth: '150px' }}>
-          <option value="">All wallets</option>
-          {wallets.map(w => <option key={w} value={w}>{w}</option>)}
-        </select>
-        <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0) }} className="input" style={{ fontSize: '13px' }}>
-          {PAGE_SIZES.map(s => <option key={s} value={s}>{s} per page</option>)}
-        </select>
-        <span style={{ fontSize: '12px', color: 'var(--text-3)', marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>{total} NFTs</span>
-        {selected.size > 0 && (
-          <button onClick={() => setSelected(new Set())} className="btn btn-ghost">Deselect all</button>
-        )}
-        <button onClick={selectAllIpfs} className="btn btn-ghost">Select IPFS</button>
-        {canUnpin && (
-          <button onClick={unpinSelected} disabled={!canUnpin} className="btn btn-danger">
-            {unpinning ? 'Unpinning…' : 'Unpin'}
-          </button>
-        )}
-        <button
-          onClick={pinSelected}
-          disabled={!canPin}
-          className="btn btn-primary"
-          style={{ opacity: canPin ? 1 : 0.35 }}
-        >
-          {pinning ? 'Pinning…' : `Pin${selected.size ? ` (${selected.size})` : ''}`}
-        </button>
+      <div className="flex items-center justify-between">
+        <div className='flex items-center gap-2 flex-wrap flex-1'> 
+          <input
+            type="text" placeholder="Search…" value={search}
+            onChange={e => { setSearch(e.target.value); setPage(0) }}
+            className="input"
+            style={{ width: '150px', fontSize: '13px' }}
+          />
+          <select value={chainFilter} onChange={e => { setChainFilter(e.target.value); setPage(0) }} className="input" style={{ fontSize: '13px' }}>
+            <option value="">All chains</option>
+            {chains.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select value={walletFilter} onChange={e => { setWalletFilter(e.target.value); setPage(0) }} className="input" style={{ fontSize: '13px', maxWidth: '150px' }}>
+            <option value="">All wallets</option>
+            {wallets.map(w => <option key={w} value={w}>{w}</option>)}
+          </select>
+          <select value={contractFilter} onChange={e => { setContractFilter(e.target.value); setPage(0) }} className="input" style={{ fontSize: '13px', maxWidth: '150px' }}>
+            <option value="">All contracts</option>
+            {contracts.map(c => <option key={c} value={c}>{c.slice(0, 6)}…{c.slice(-4)}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-4">
+          <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0) }} className="input" style={{ fontSize: '13px' }}>
+            {PAGE_SIZES.map(s => <option key={s} value={s}>{s} per page</option>)}
+          </select>
+          <span style={{ fontSize: '12px', color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>{total} NFTs</span>
+          {/* View toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 'var(--r1)', padding: '2px', gap: '1px' }}>
+            {[
+              { id: 'small',  icon: <SmallViewIcon /> },
+              { id: 'large',  icon: <LargeViewIcon /> },
+              { id: 'detail', icon: <DetailViewIcon /> },
+            ].map(({ id, icon }) => (
+              <button key={id} onClick={() => setView(id)} title={id} style={{
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                width: '26px', 
+                height: '22px',
+                borderRadius: '3px',
+                border: 'none',
+                background: view === id ? 'var(--bg-3)' : 'transparent',
+                color: view === id ? 'var(--accent)' : 'var(--text-4)',
+                cursor: 'pointer',
+                transition: 'background var(--ease), color var(--ease)',
+              }}>
+                {icon}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Progress bar */}
@@ -216,54 +286,65 @@ export default function IpfsPage() {
       )}
 
       {/* List */}
-      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1px' }}>
-        {filtered.map(nft => {
-          const source     = getSource(nft)
-          const sc         = SOURCE_COLORS[source]
-          const isSelected = selected.has(nft.id)
-          const thumb      = nft.image?.thumbnailUrl || nft.image?.cachedUrl
-          return (
-            <div key={nft.id} onClick={() => toggleSelect(nft.id)} style={{
-              display: 'flex', alignItems: 'center', gap: '10px',
-              padding: '8px 10px', borderRadius: 'var(--r2)', cursor: 'pointer',
-              background: isSelected ? 'var(--accent-xlo)' : 'transparent',
-              borderLeft: isSelected ? '2px solid var(--accent-bdr)' : '2px solid transparent',
-              transition: 'background var(--ease)',
-            }}>
-              <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(nft.id)}
-                onClick={e => e.stopPropagation()}
-                style={{ accentColor: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }} />
+      <div ref={listRef} style={{ flex: 1, overflowY: 'auto' }}>
+        <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+          {virtualizer.getVirtualItems().map(virtualRow => {
+            const nft        = filtered[virtualRow.index]
+            const source     = getSource(nft)
+            const isSelected = selected.has(nft.id)
+            const thumb      = nft.image?.thumbnailUrl || nft.image?.cachedUrl
+            return (
+              <div
+                key={virtualRow.key}
+                data-index={virtualRow.index}
+                ref={virtualizer.measureElement}
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${virtualRow.start}px)`, paddingBottom: '1px' }}
+              >
+                <div onClick={() => toggleSelect(nft.id)} style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '8px 10px', borderRadius: 'var(--r2)', cursor: 'pointer',
+                  background: isSelected ? 'var(--accent-xlo)' : 'transparent',
+                  borderLeft: isSelected ? '2px solid var(--accent-bdr)' : '2px solid transparent',
+                  transition: 'background var(--ease)',
+                }}>
+                  <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(nft.id)}
+                    onClick={e => e.stopPropagation()}
+                    style={{ accentColor: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }} />
 
-              {thumb && (
-                <img src={thumb} alt=""
-                  style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: 'var(--r2)', flexShrink: 0 }}
-                  onError={e => { e.target.style.display = 'none' }} />
-              )}
+                  {thumb && (
+                    <img src={thumb} alt="" loading="lazy"
+                      style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: 'var(--r2)', flexShrink: 0 }}
+                      onError={e => { e.target.style.display = 'none' }} />
+                  )}
 
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '14px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {nft.name || nft.contract?.name || 'Unnamed'}
-                </div>
-                {nft.cid && (
-                  <div style={{ fontSize: '11px', color: 'var(--accent)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
-                    {nft.cid}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '14px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {nft.name || nft.contract?.name || 'Unnamed'}
+                    </div>
+                    {nft.cid && (
+                      <div style={{ fontSize: '11px', color: 'var(--accent)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
+                        {nft.cid}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: '9px', fontWeight: 600, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>{nft.chain}</span>
-              <span style={{ fontSize: '11px', color: sc.color, background: sc.bg, padding: '2px 8px', borderRadius: '20px', flexShrink: 0 }}>
-                {source}
-              </span>
-              {nft.localPath && (
-                <span className="badge badge-blue" style={{ flexShrink: 0 }}>downloaded</span>
-              )}
-              {nft.cid && (
-                <span className="badge badge-green" style={{ flexShrink: 0 }}>pinned</span>
-              )}
-            </div>
-          )
-        })}
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '9px', fontWeight: 600, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>{nft.chain}</span>
+                  {source === 'ipfs' && (
+                    <div className='flex w-8 h-4 items-center justify-center rounded-lg bg-cyan-300/20 text-cyan-300 text-xs font-mono' style={{ flexShrink: 0 }}>ipfs</div>
+                  )}
+                  {source === 'arweave' && (
+                    <div className='flex w-4 h-4 items-center justify-center rounded-full bg-white text-black font-bold' style={{ flexShrink: 0 }}>a</div>
+                  )}
+                  {source === 'http' && (
+                    <div className='flex w-8 h-4 items-center justify-center rounded-lg bg-gray-600/20 text-gray-100 text-xs font-mono' style={{ flexShrink: 0 }}>http</div>
+                  )}
+                  {nft.localPath && <span className="badge badge-blue" style={{ flexShrink: 0 }}>downloaded</span>}
+                  {nft.cid      && <span className="badge badge-green" style={{ flexShrink: 0 }}>pinned</span>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* Pagination */}

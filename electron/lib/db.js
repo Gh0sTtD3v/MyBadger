@@ -47,6 +47,27 @@ function setMediaDir(newPath) {
   saveSettings(settings)
 }
 
+function getLlmDir() {
+  return loadSettings().llmDir || null
+}
+
+function getIpfsAutoStart() {
+  const s = loadSettings()
+  return s.ipfsAutoStart !== undefined ? s.ipfsAutoStart : false
+}
+
+function setIpfsAutoStart(val) {
+  const settings = loadSettings()
+  settings.ipfsAutoStart = val
+  saveSettings(settings)
+}
+
+function setLlmDir(newPath) {
+  const settings = loadSettings()
+  settings.llmDir = newPath
+  saveSettings(settings)
+}
+
 // ── Raw NFTs ──────────────────────────────────────────────
 
 async function upsertNFTs(rows) {
@@ -67,10 +88,11 @@ async function clearRawNfts() {
   await nfts.compactDatafileAsync()
 }
 
-async function queryRawNfts({ search, chain, wallet, limit = 50, offset = 0 } = {}) {
+async function queryRawNfts({ search, chain, wallet, contract, limit = 50, offset = 0 } = {}) {
   const query = {}
-  if (chain)  query.chain  = chain
-  if (wallet) query.wallet = wallet
+  if (chain)    query.chain             = chain
+  if (wallet)   query.wallet            = wallet
+  if (contract) query['contract.address'] = contract
   if (search) query.$or = [{ name: new RegExp(search, 'i') }, { 'contract.name': new RegExp(search, 'i') }, { 'collection.name': new RegExp(search, 'i') }]
   const rows  = await nfts.findAsync(query, { id: 1, name: 1, chain: 1, wallet: 1, tokenId: 1, contract: 1, collection: 1, image: 1, animation: 1, cid: 1, localPath: 1 }).skip(offset).limit(limit)
   const total = await nfts.countAsync(query)
@@ -78,8 +100,9 @@ async function queryRawNfts({ search, chain, wallet, limit = 50, offset = 0 } = 
 }
 
 async function getDistinctRawValues(field) {
-  const docs = await nfts.findAsync({}, { [field]: 1 })
-  return [...new Set(docs.map(d => d[field]).filter(Boolean))].sort()
+  const parts = field.split('.')
+  const docs = await nfts.findAsync({}, { [parts[0]]: 1 })
+  return [...new Set(docs.map(d => parts.reduce((o, k) => o?.[k], d)).filter(Boolean))].sort()
 }
 
 async function getRawNftById(id) {
@@ -102,6 +125,13 @@ async function removePin(nftId) {
 
 async function listPins() {
   return pins.findAsync({}).sort({ pinnedAt: -1 })
+}
+
+async function clearIpfsPins() {
+  await pins.removeAsync({}, { multi: true })
+  await pins.compactDatafileAsync()
+  await nfts.updateAsync({ cid: { $exists: true } }, { $unset: { cid: true } }, { multi: true })
+  await curatedNfts.updateAsync({ cid: { $exists: true } }, { $unset: { cid: true } }, { multi: true })
 }
 
 // ── Curations ─────────────────────────────────────────────
@@ -173,9 +203,9 @@ async function getCurationStats(curationId) {
 }
 
 module.exports = {
-  initDb, getMediaDir, setMediaDir,
+  initDb, getMediaDir, setMediaDir, getLlmDir, setLlmDir, getIpfsAutoStart, setIpfsAutoStart,
   upsertNFTs, patchRawNft, clearRawNfts, queryRawNfts, getDistinctRawValues, getRawNftById, getRawNftCount,
-  upsertPin, removePin, listPins,
+  upsertPin, removePin, listPins, clearIpfsPins,
   createCuration, listCurations, getCurationById, deleteCuration,
   upsertCuratedNft, patchCuratedNft, removeCuratedNfts, getCuratedNftIds, getCuratedNfts, getDistinctCuratedValues, getCurationStats,
 }

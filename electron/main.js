@@ -38,8 +38,11 @@ function createWindow() {
 
 app.whenReady().then(() => {
   db.initDb(app.getPath('userData'))
-  ipfs.initIpfs(app.getPath('userData'))
-  llm.initLlm(app.getPath('userData'))
+  llm.initLlm(app.getPath('userData'), db.getLlmDir())
+
+  if (db.getIpfsAutoStart()) {
+    setTimeout(() => ipfs.initIpfs(app.getPath('userData')), 3000)
+  }
 
   protocol.handle('nftmedia', (request) => {
     const filepath = decodeURIComponent(new URL(request.url).pathname.replace(/^\//, ''))
@@ -53,20 +56,59 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
 app.on('before-quit', () => ipfs.stopIpfs())
 
-ipcMain.handle('llm:status',   () => llm.getStatus())
+ipcMain.handle('llm:status',      () => llm.getStatus())
+ipcMain.handle('llm:getModelsDir', () => llm.getModelsDir())
+ipcMain.handle('llm:setModelsDir', (_e, newPath) => {
+  db.setLlmDir(newPath)
+  llm.setModelsDir(newPath)
+  return { ok: true }
+})
 ipcMain.handle('llm:download', async (event) => {
   const result = await llm.downloadModel(p => event.sender.send('llm-event', p))
   if (result.ok) await llm.initLlm(app.getPath('userData'))
   return result
 })
 
-ipcMain.handle('ipfs:status', () => ipfs.getStatus())
+ipcMain.handle('ipfs:status',       () => ipfs.getStatus())
+ipcMain.handle('ipfs:start',        async () => { try { return await ipfs.initIpfs(app.getPath('userData')) } catch (err) { return { ok: false, error: err.message } } })
+ipcMain.handle('ipfs:getAutoStart', () => db.getIpfsAutoStart())
+ipcMain.handle('ipfs:setAutoStart', (_e, val) => { db.setIpfsAutoStart(val); return { ok: true } })
+ipcMain.handle('ipfs:prune',  async () => {
+  try {
+    const result = await ipfs.pruneIpfs()
+    await db.clearIpfsPins()
+    return result
+  } catch (err) { return { error: err.message } }
+})
 ipcMain.handle('pins:list',   () => db.listPins())
 ipcMain.handle('ipfs:unpin', async (_e, { nftId, cid }) => {
   try { await ipfs.unpinCid(cid) } catch (err) { return { error: err.message } }
   await db.patchRawNft(nftId, { cid: null })
   await db.removePin(nftId)
   return { ok: true }
+})
+ipcMain.handle('ipfs:pinRaw', async (_e, { nftId, localPath }) => {
+  const existing = await db.listPins().then(p => p.find(x => x.nftId === nftId))
+  if (existing?.cid) return { cid: existing.cid, cached: true }
+
+  const nft = await db.getRawNftById(nftId)
+  const originalUrl = nft?.animation?.originalUrl || nft?.image?.originalUrl || ''
+  const ipfsMatch  = originalUrl.match(/^ipfs:\/\/([^/?#\s]+)(\/[^?#\s]*)?/)
+                  || originalUrl.match(/\/ipfs\/([^/?#\s]+)(\/[^?#\s]*)?/)
+  const originalCid  = ipfsMatch?.[1] || null
+  const ipfsFilePath = ipfsMatch?.[2] || null
+
+  let cid
+  if (originalCid) {
+    try { await ipfs.pinByCid(originalCid, ipfsFilePath, 30000) } catch (_) {}
+    cid = originalCid
+  } else {
+    try { cid = await ipfs.pinFile(path.join(db.getMediaDir(), localPath)) } catch (err) { return { cid: null, error: err.message } }
+  }
+
+  await db.patchRawNft(nftId, { cid })
+  await db.upsertPin(nftId, { cid, localPath, name: nft?.name || nftId, chain: nft?.chain || null, wallet: nft?.wallet || null, url: originalUrl })
+  return { cid }
 })
 ipcMain.handle('ipfs:pin', async (_e, { curationId, nftId, localPath }) => {
   const fullPath = require('path').join(db.getMediaDir(), localPath)
@@ -77,14 +119,11 @@ ipcMain.handle('ipfs:pin', async (_e, { curationId, nftId, localPath }) => {
 ipcMain.handle('ipfs:pinUrl', async (_e, { nftId, url }) => {
   const existing = await db.listPins().then(p => p.find(x => x.nftId === nftId))
   if (existing?.cid) return { cid: existing.cid, cached: true }
+
   const axios = require('axios')
   const mediaBase = db.getMediaDir()
   const dir = path.join(mediaBase, nftId)
   fs.mkdirSync(dir, { recursive: true })
-
-  const fetchUrl = url
-    .replace('ipfs://', 'https://nftstorage.link/ipfs/')
-    .replace('ar://', 'https://arweave.net/')
 
   const EXT_MAP = {
     'image/png': '.png', 'image/jpeg': '.jpg', 'image/gif': '.gif',
@@ -92,37 +131,65 @@ ipcMain.handle('ipfs:pinUrl', async (_e, { nftId, url }) => {
     'video/mp4': '.mp4', 'video/webm': '.webm', 'video/ogg': '.ogv',
   }
 
-  let localFile
-  try {
-    const response = await axios.get(fetchUrl, {
-      responseType: 'stream',
-      timeout: 30000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://opensea.io/',
-      },
-    })
-    const urlExt = fetchUrl.match(/\.(png|jpg|jpeg|gif|webp|svg|avif|mp4|webm|ogv|mov)(\?|$)/i)?.[1]
-    const ext = urlExt ? '.' + urlExt.toLowerCase() : (EXT_MAP[response.headers['content-type']] || '.bin')
-    localFile = path.join(dir, 'original' + ext)
-    await new Promise((resolve, reject) => {
-      const writer = fs.createWriteStream(localFile)
-      response.data.pipe(writer)
-      writer.on('finish', resolve)
-      writer.on('error', reject)
-      response.data.on('error', reject)
-    })
-  } catch (err) {
-    return { cid: null, error: err.message }
+  // Extract original CID + file path if this is an IPFS URL
+  const ipfsMatch   = url.match(/^ipfs:\/\/([^/?#\s]+)(\/[^?#\s]*)?/)
+                   || url.match(/\/ipfs\/([^/?#\s]+)(\/[^?#\s]*)?/)
+  const originalCid  = ipfsMatch?.[1] || null
+  const ipfsFilePath = ipfsMatch?.[2] || null
+
+  const urlExt = url.match(/\.(png|jpg|jpeg|gif|webp|svg|avif|mp4|webm|ogv|mov)(\?|$)/i)?.[1]
+
+  let localFile, cid
+
+  // Try fetching from IPFS network by original CID first
+  if (originalCid) {
+    try {
+      const bytes = await ipfs.pinByCid(originalCid, ipfsFilePath, 30000)
+      const ext = urlExt ? '.' + urlExt.toLowerCase() : '.bin'
+      localFile = path.join(dir, 'original' + ext)
+      fs.writeFileSync(localFile, bytes)
+      cid = originalCid
+    } catch (_) {
+      // Network fetch failed — fall through to HTTP
+    }
   }
 
-  let cid
-  try {
-    cid = await ipfs.pinFile(localFile)
-  } catch (err) {
-    return { cid: null, error: `pin failed: ${err.message}` }
+  // HTTP fallback (also used for arweave / plain http URLs)
+  if (!localFile) {
+    const fetchUrl = url
+      .replace('ipfs://', 'https://nftstorage.link/ipfs/')
+      .replace('ar://', 'https://arweave.net/')
+    try {
+      const response = await axios.get(fetchUrl, {
+        responseType: 'stream',
+        timeout: 30000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': 'https://opensea.io/',
+        },
+      })
+      const ext = urlExt ? '.' + urlExt.toLowerCase() : (EXT_MAP[response.headers['content-type']] || '.bin')
+      localFile = path.join(dir, 'original' + ext)
+      await new Promise((resolve, reject) => {
+        const writer = fs.createWriteStream(localFile)
+        response.data.pipe(writer)
+        writer.on('finish', resolve)
+        writer.on('error', reject)
+        response.data.on('error', reject)
+      })
+    } catch (err) {
+      return { cid: null, error: err.message }
+    }
+
+    // Add bytes to local blockstore. For IPFS content, prefer the original CID in the DB.
+    try {
+      const computedCid = await ipfs.pinFile(localFile)
+      cid = originalCid || computedCid
+    } catch (err) {
+      return { cid: null, error: `pin failed: ${err.message}` }
+    }
   }
 
   const localPath = path.join(nftId, path.basename(localFile))

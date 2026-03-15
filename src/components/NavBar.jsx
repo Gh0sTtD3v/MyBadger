@@ -24,7 +24,7 @@ export default function NavBar() {
   }, [open])
 
   return (
-    <nav ref={navRef} style={{
+    <nav ref={navRef} onMouseLeave={() => setOpen(false)} onMouseEnter={() => setOpen(true)} style={{
       width: open ? W_OPEN : W_CLOSED,
       minWidth: open ? W_OPEN : W_CLOSED,
       height: '100vh',
@@ -85,11 +85,11 @@ export default function NavBar() {
           textTransform: 'uppercase',
           color: 'var(--text-4)',
           whiteSpace: 'nowrap',
-        }}>Curations</span>
+        }}>Collections</span>
       </div>
 
       {/* Curations list */}
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingTop: '2px', overflowY: open ? 'auto' : 'hidden', marginLeft: '24px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, paddingTop: '2px', overflow: open ? 'auto hidden' : 'hidden', marginLeft: '24px' }}>
         {curations.length === 0 && (
           <span style={{
             padding: '5px 14px 5px 34px',

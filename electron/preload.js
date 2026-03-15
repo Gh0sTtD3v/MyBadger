@@ -50,6 +50,8 @@ contextBridge.exposeInMainWorld('electron', {
   // LLM
   llm: {
     status:          ()         => invoke('llm:status'),
+    getModelsDir:    ()         => invoke('llm:getModelsDir'),
+    setModelsDir:    (dir)      => invoke('llm:setModelsDir', dir),
     download:        ()         => invoke('llm:download'),
     test:            (jsonText) => invoke('llm:test', jsonText),
     onEvent:         (cb)       => ipcRenderer.on('llm-event', (_e, p) => cb(p)),
@@ -58,10 +60,15 @@ contextBridge.exposeInMainWorld('electron', {
 
   // IPFS
   ipfs: {
-    status: ()                              => invoke('ipfs:status'),
+    status:       ()      => invoke('ipfs:status'),
+    start:        ()      => invoke('ipfs:start'),
+    getAutoStart: ()      => invoke('ipfs:getAutoStart'),
+    setAutoStart: (val)   => invoke('ipfs:setAutoStart', val),
     pin:    (curationId, nftId, localPath)  => invoke('ipfs:pin', { curationId, nftId, localPath }),
+    pinRaw: (nftId, localPath)             => invoke('ipfs:pinRaw', { nftId, localPath }),
     pinUrl: (nftId, url)                    => invoke('ipfs:pinUrl', { nftId, url }),
     unpin:  (nftId, cid)                    => invoke('ipfs:unpin', { nftId, cid }),
+    prune:  ()                              => invoke('ipfs:prune'),
   },
 
   // Pins (persisted across re-scans)

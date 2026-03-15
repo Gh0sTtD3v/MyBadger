@@ -27,8 +27,11 @@ function findModelFile() {
 function isDownloaded() { return !!findModelFile() }
 function isReady() { return !!model }
 
-async function initLlm(dataDir) {
-  modelsDir = path.join(dataDir, 'models')
+function setModelsDir(dir) { modelsDir = dir }
+function getModelsDir()    { return modelsDir }
+
+async function initLlm(dataDir, customDir) {
+  modelsDir = customDir || path.join(dataDir, 'models')
   const found = findModelFile()
   if (!found) return
 
@@ -111,4 +114,4 @@ function getStatus() {
   return { ready: isReady(), downloaded: isDownloaded(), downloading, error: initError, modelFile: MODEL_FILE }
 }
 
-module.exports = { initLlm, downloadModel, extractImageUrl, isReady, getStatus }
+module.exports = { initLlm, setModelsDir, getModelsDir, downloadModel, extractImageUrl, isReady, getStatus }

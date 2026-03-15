@@ -1,5 +1,30 @@
+@import "tailwindcss";
+
 /* ── Fonts ─────────────────────────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── Tailwind theme mapping ─────────────────────────────────────────── */
+@theme {
+  --color-bg:          #080808;
+  --color-bg-1:        #101012;
+  --color-bg-2:        #18181b;
+  --color-bg-3:        #222226;
+  --color-border:      #27272a;
+  --color-border-md:   #3f3f46;
+  --color-text:        #f4f4f5;
+  --color-text-2:      #c4c4cc;
+  --color-text-3:      #9898a8;
+  --color-text-4:      #68687a;
+  --color-accent:      #a3e635;
+  --color-accent-hi:   #bef264;
+  --color-red:         #f87171;
+  --color-red-bg:      #1f0a0a;
+  --color-blue:        #60a5fa;
+  --color-blue-bg:     #0a1525;
+  --font-ui:           'DM Sans', system-ui, sans-serif;
+  --font-display:      'Syne', system-ui, sans-serif;
+  --font-mono:         'JetBrains Mono', 'Fira Code', monospace;
+}
 
 /* ── Design tokens ─────────────────────────────────────────────────── */
 :root {

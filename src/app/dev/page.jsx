@@ -14,6 +14,8 @@ export default function DevPage() {
   const [input,   setInput]   = useState('')
   const [result,  setResult]  = useState(null)
   const [loading, setLoading] = useState(false)
+  const [pruning, setPruning] = useState(false)
+  const [pruneResult, setPruneResult] = useState(null)
 
   async function runTest() {
     if (!input.trim() || !window.electron) return
@@ -27,6 +29,15 @@ export default function DevPage() {
   function loadExample() {
     setInput(PLACEHOLDER)
     setResult(null)
+  }
+
+  async function pruneIpfs() {
+    if (!window.electron) return
+    setPruning(true)
+    setPruneResult(null)
+    const res = await window.electron.ipfs.prune()
+    setPruneResult(res)
+    setPruning(false)
   }
 
   const hasResult = result !== null
@@ -48,6 +59,19 @@ export default function DevPage() {
         >
           {loading ? 'Running…' : 'Run'}
         </button>
+      </div>
+
+      {/* IPFS tools */}
+      <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+        <span className="section-label">IPFS</span>
+        <button onClick={pruneIpfs} disabled={pruning} className="btn btn-ghost">
+          {pruning ? 'Pruning…' : 'Prune blockstore'}
+        </button>
+        {pruneResult && (
+          pruneResult.error
+            ? <span style={{ fontSize: '12px', color: 'var(--red)', fontFamily: 'var(--font-mono)' }}>{pruneResult.error}</span>
+            : <span style={{ fontSize: '12px', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>{pruneResult.pruned} block{pruneResult.pruned !== 1 ? 's' : ''} removed</span>
+        )}
       </div>
 
       {/* Split panes */}
